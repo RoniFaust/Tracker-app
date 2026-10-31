@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#5B3A7A">
+<title>יומן בריאות</title>
+<link rel="manifest" href="tracker-manifest.json">
+<link rel="icon" href="tracker-icon-192.png">
+<link rel="apple-touch-icon" href="tracker-icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&family=Frank+Ruhl+Libre:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #FAF6EF; --card: #FFFFFF; --line: #E8DFD1; --line2: #F0E9DD; --chipline: #DDD3C4;
+  --ink: #2A2230; --ink2: #4A4150; --muted: #6E6475; --accent: #5B3A7A; --accent-soft: #F3EDF7;
+  --gold: #8F6B1E; --rose: #B03A62; --blue-soft: #EEF3FA;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'Assistant', system-ui, sans-serif; font-size: 16px; }
+body { min-height: 100vh; }
+button, input, textarea, select { font-family: inherit; font-size: inherit; color: inherit; }
+button { cursor: pointer; }
+.serif { font-family: 'Frank Ruhl Libre', serif; }
+#view { max-width: 560px; margin: 0 auto; padding: 0 16px calc(96px + var(--safe-b)); }
+h1 { font-family: 'Frank Ruhl Libre', serif; font-weight: 700; font-size: 26px; margin: 0; }
+h2 { font-size: 17px; font-weight: 700; margin: 0 0 10px; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.xs { font-size: 12px; }
+.lbl { font-size: 13px; color: var(--muted); margin: 12px 0 8px; }
+.lbl:first-child { margin-top: 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px; margin-top: 14px; }
+.row { display: flex; align-items: center; gap: 8px; }
+.between { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+.grid7 { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.chip { min-height: 40px; padding: 0 14px; border-radius: 20px; border: 1px solid var(--chipline); background: #fff; font-size: 14px; font-weight: 600; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.chip.dashed { border-style: dashed; border-color: #C9BBA6; }
+.seg { display: inline-flex; padding: 3px; border-radius: 12px; background: #EFE8DC; }
+.seg button { min-height: 36px; padding: 0 14px; border-radius: 9px; border: none; background: transparent; font-size: 14px; font-weight: 700; color: var(--ink2); }
+.seg button[aria-pressed="true"] { background: #fff; color: var(--accent); box-shadow: 0 1px 3px rgba(42,34,48,.15); }
+.btn { min-height: 48px; border-radius: 12px; border: none; background: var(--accent); color: #fff; font-weight: 700; font-size: 15px; padding: 0 18px; }
+.btn.ghost { background: #fff; color: var(--ink); border: 1px solid var(--chipline); font-weight: 600; }
+.btn.soft { background: var(--accent-soft); color: var(--accent); border: 1.5px dashed #B9A6C8; }
+.btn.block { width: 100%; }
+.iconbtn { width: 44px; height: 44px; border: none; background: transparent; display: inline-flex; align-items: center; justify-content: center; color: var(--accent); border-radius: 12px; }
+.input { width: 100%; min-height: 46px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--chipline); background: var(--bg); font-size: 16px; }
+textarea.input { padding: 10px 14px; min-height: 0; resize: none; }
+.scale { display: grid; gap: 6px; }
+.scale button { min-height: 44px; border-radius: 10px; border: none; font-weight: 700; font-size: 15px; outline-offset: 2px; }
+.scale button[aria-pressed="true"] { outline: 3px solid var(--accent); }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; display: inline-block; }
+.sw { width: 12px; height: 12px; border-radius: 4px; border: 1px solid rgba(42,34,48,.15); display: inline-block; flex: 0 0 auto; }
+.tl-item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line2); }
+.tl-time { width: 46px; flex: 0 0 auto; font-size: 14px; font-weight: 700; color: var(--ink2); padding-top: 2px; }
+.stat { background: var(--bg); border-radius: 10px; padding: 8px; }
+.stat b { display: block; font-size: 16px; }
+.stat span { font-size: 11px; color: var(--muted); font-weight: 600; }
+.bar { height: 8px; border-radius: 4px; background: #F1ECE3; overflow: hidden; }
+.bar > div { height: 8px; background: var(--gold); border-radius: 4px; }
+/* calendar */
+.cal-cell { position: relative; height: 50px; border-radius: 12px; border: 1px solid rgba(42,34,48,.08); font-size: 16px; font-weight: 600; padding: 0; background: #fff; }
+.cal-cell.today { border: 2px solid var(--ink); font-weight: 800; }
+.cal-cell.sel { outline: 2.5px solid var(--accent); outline-offset: 2px; }
+.cal-cell.empty { visibility: hidden; }
+.cal-cell.future { opacity: .55; }
+.cal-strip { position: absolute; top: 5px; left: 6px; right: 6px; height: 5px; display: flex; gap: 1px; border-radius: 3px; overflow: hidden; box-shadow: 0 0 0 1px rgba(255,255,255,.85); }
+.cal-strip i { flex: 1 1 0; }
+.cal-bleed { position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); width: 7px; height: 7px; border-radius: 50%; background: var(--rose); box-shadow: 0 0 0 1.5px #fff; }
+.cal-bleed.pred { background: transparent; border: 1.5px solid var(--rose); }
+.layers { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 10px; margin: 0 -16px; padding-inline: 16px; scrollbar-width: none; }
+.layers::-webkit-scrollbar { display: none; }
+.layers .chip { flex: 0 0 auto; }
+/* tab bar */
+#tabs { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(4, 1fr); padding: 6px 8px calc(8px + var(--safe-b)); z-index: 20; }
+#tabs button { border: none; background: none; display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 48px; justify-content: center; font-size: 12px; font-weight: 600; color: var(--muted); }
+#tabs button[aria-current="page"] { color: var(--accent); font-weight: 800; }
+/* sheet */
+#sheet { position: fixed; inset: 0; background: rgba(42,34,48,.35); z-index: 50; display: none; align-items: flex-end; justify-content: center; }
+#sheet.open { display: flex; }
+#sheet .panel { background: var(--bg); width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto; border-radius: 22px 22px 0 0; padding: 18px 16px calc(18px + var(--safe-b)); }
+.fam-title { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; margin: 10px 0 6px; }
+.bristol button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--chipline); background: #fff; text-align: right; font-size: 14px; font-weight: 600; }
+.bristol button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.bristol .n { width: 26px; height: 26px; border-radius: 50%; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; flex: 0 0 auto; }
+.toast { position: fixed; bottom: calc(84px + var(--safe-b)); left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 14px; z-index: 60; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font-family: 'Assistant', sans-serif; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: #fff; font-size: 12px; padding: 6px 8px; border-radius: 8px; white-space: nowrap; transform: translate(-50%, -110%); }
+.insight { padding: 12px 0; border-top: 1px solid var(--line2); }
+.insight:first-of-type { border-top: none; }
+.pill { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 12px; }
+details > summary { list-style: none; cursor: pointer; }
+details > summary::-webkit-details-marker { display: none; }
+</style>
+</head>
+<body>
+<main id="view"></main>
+<nav id="tabs" aria-label="ניווט ראשי">
+  <button data-tab="cal" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>לוח שנה</button>
+  <button data-tab="charts"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15l4-5 3 3 4-6"/></svg>גרפים</button>
+  <button data-tab="insights"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>תובנות</button>
+  <button data-tab="settings"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>הגדרות</button>
+</nav>
+<div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
+<script>
+'use strict';
+/* =====================================================================
+   יומן בריאות — core: constants, storage, dates, cycle, daily metrics
+   All data lives in localStorage under keys prefixed "tracker." so it never
+   collides with Workout Pro (same origin), whose log we only READ.
+   ===================================================================== */
+
+const KEY = 'tracker.data';
+const WORKOUT_KEY = 'workoutLog'; // owned by Workout Pro — read only
+
+const DARK = '#2A2230', WHITE = '#FFFFFF';
+
+/* ---------- option lists (agreed together) ---------- */
+const FAMS = [
+  { id: 'anger',  name: 'כעס ועצבנות',   c: '#e34948', items: ['עצבנית', 'כועסת', 'מתוסכלת', 'חסרת סבלנות', 'עוקצנית'] },
+  { id: 'stress', name: 'סטרס וחרדה',    c: '#eb6834', items: ['לחוצה', 'חרדה', 'מודאגת', 'מוצפת', 'חסרת מנוחה'] },
+  { id: 'sad',    name: 'עצב',           c: '#2a78d6', items: ['עצובה', 'בודדה', 'מאוכזבת', 'פגועה', 'רגישה / בוכייה'] },
+  { id: 'low',    name: 'דכדוך וריקנות', c: '#6250d6', items: ['מדוכדכת', 'חסרת תקווה', 'ריקה / אדישה', 'חסרת מוטיבציה', 'מותשת רגשית'] },
+  { id: 'calm',   name: 'רוגע',          c: '#e87ba4', items: ['רגועה', 'שלווה', 'מסופקת', 'בטוחה', 'אסירת תודה'] },
+  { id: 'joy',    name: 'שמחה ואנרגיה',  c: '#eda100', items: ['שמחה', 'אופטימית', 'נלהבת', 'מרוכזת', 'מלאת מוטיבציה', 'גאה'] }
+];
+// legend / chart order chosen so neighbouring colours stay distinguishable (validated)
+const FAM_LEGEND = ['anger', 'sad', 'stress', 'low', 'joy', 'calm'];
+const famById = id => FAMS.find(f => f.id === id);
+const famOfWord = w => FAMS.find(f => f.items.includes(w));
+
+const MOOD_LABELS = ['קשה', 'לא משהו', 'בסדר', 'טוב', 'מצוין'];
+const MOOD_DIV = ['#A8466C', '#D9A0B4', '#EDE3D2', '#A9C2E0', '#3F6FA8'];
+const INTENSITY = ['קלה', 'בינונית', 'חזקה'];
+
+const PAIN_AREAS = ['אגן', 'בטן תחתונה', 'צד ימין', 'צד שמאל', 'גב תחתון', 'ירכיים ורגליים', 'פי הטבעת', 'ראש', 'מפרקים', 'כתפיים וצוואר'];
+const PAIN_TYPES = ['התכווצויות', 'עמום', 'חד', 'דוקר', 'צורב', 'לוחץ', 'מקרין', 'פועם'];
+const PAIN_WHEN = ['מחזור', 'יציאות', 'הטלת שתן', 'אחרי אוכל', 'תנועה או אימון', 'יחסי מין', 'ישיבה ממושכת'];
+const PAIN_HELP = ['משכך כאבים', 'חימום', 'מנוחה', 'מתיחות', 'מקלחת חמה', 'שום דבר'];
+const PAIN_IMPACT = ['לא הפריע', 'הפריע קצת', 'נאלצתי לעצור את מה שעשיתי', 'כאב משתק – התקפלות, בכי, צעקות'];
+
+const BELLY_SYMS = ['נפיחות', 'בטן קשה למגע', 'גזים', 'כאב בטן', 'התכווצויות בטן', 'עוויתות', 'דקירות', 'צרבת', 'בחילה', 'תחושת מלאות מהירה', 'דחיפות', 'תחושת ריקון חלקי'];
+const BELLY_WHEN = ['אחרי אוכל', 'סטרס', 'מחזור', 'קפה', 'ארוחה גדולה', 'ארוחה מאוחרת'];
+const BELLY_HELP = ['חימום', 'תה', 'הליכה', 'מנוחה', 'משכך כאבים או תרופה', 'שום דבר'];
+const SEVERITY = ['קלה', 'בינונית', 'חזקה', 'קשה'];
+
+const GEN_GROUPS = [
+  ['ראש וקוגניציה', ['כאב ראש', 'מיגרנה', 'ערפל מוחי', 'סחרחורת']],
+  ['אנרגיה ושינה', ['עייפות קיצונית', 'נדודי שינה']],
+  ['חום וגוף', ['חום', 'צמרמורות', 'גלי חום', 'דופק מהיר']],
+  ['הורמונלי ועור', ['רגישות בשדיים', 'אקנה', 'פריחה']],
+  ['תיאבון, שתן וריח', ['תיאבון מוגבר', 'תיאבון ירוד', 'תכיפות במתן שתן', 'רגישות לריחות']]
+];
+
+const BRISTOL = ['גושים קשים ונפרדים', 'נקניק עם גושים', 'נקניק עם סדקים', 'חלקה ורכה', 'חתיכות רכות', 'רכה ודייסתית', 'מימית'];
+const BRISTOL_C = ['#7A3F1E', '#93522A', '#A86A3C', '#5B3A7A', '#B07D1A', '#C0603A', '#B23A48'];
+
+const BLEED = ['אין', 'הכתמה', 'קל', 'בינוני', 'כבד'];
+const CYCLE_EXTRAS = ['קרישי דם', 'כתמים בין מחזורים'];
+const SLEEP_H = ['פחות מ-5', '5–6', '6–7', '7–8', '8+'];
+const SLEEP_H_NUM = [4.5, 5.5, 6.5, 7.5, 8.5];
+const SLEEP_Q = ['גרועה', 'בינונית', 'טובה', 'מצוינת'];
+
+const SLOTS = ['כל היום', 'בוקר', 'צהריים', 'ערב', 'ביניים / נשנוש', 'לילה'];
+const PREP = ['ביתי', 'קנוי', 'בחוץ / מסעדה'];
+const CRAVES = ['מתוק', 'מלוח', 'שוקולד', 'פחמימות', 'רק אוכל יבש', 'רתיעה מאוכל', 'רתיעה מריחות של אוכל'];
+const FOOD_CATS = [
+  ['gluten', 'גלוטן / לחם'], ['dairy', 'מוצרי חלב'], ['eggs', 'ביצים'], ['sugar', 'סוכר ומתוקים'],
+  ['caffeine', 'קפאין'], ['fried', 'מטוגן / שומני'], ['legumes', 'קטניות'], ['onion', 'בצל ושום'],
+  ['spicy', 'חריף'], ['alcohol', 'אלכוהול'], ['salty', 'חטיפים מלוחים'], ['veg', 'ירקות'],
+  ['fruit', 'פירות'], ['processed', 'מזון מעובד']
+];
+const catName = id => (FOOD_CATS.find(c => c[0] === id) || [id, id])[1];
+
+const SUPP_TIMES = ['בוקר', 'צהריים', 'ערב', 'לפני שינה'];
+const FREQS = [['daily', 'כל יום'], ['alt', 'יום כן יום לא'], ['weekly', 'X פעמים בשבוע'], ['days', 'ימים קבועים']];
+const DAY_LETTERS = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
+const DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+const MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+
+const KIND_C = { mood: '#5B3A7A', pain: '#45215A', belly: '#A35A2E', stool: '#7A5A3A', other: '#3F6FA8' };
+
+/* ---------- dates (local, YYYY-MM-DD) ---------- */
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const parseD = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 12); };
+const addDays = (s, n) => { const d = parseD(s); d.setDate(d.getDate() + n); return ymd(d); };
+const diffDays = (a, b) => Math.round((parseD(b) - parseD(a)) / 86400000); // b - a
+const todayS = () => ymd(new Date());
+const nowHM = () => { const d = new Date(); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+const fmtLong = s => { const d = parseD(s); return 'יום ' + DAY_NAMES[d.getDay()] + ', ' + d.getDate() + ' ב' + MONTHS[d.getMonth()]; };
+const fmtShort = s => { const d = parseD(s); return d.getDate() + '.' + (d.getMonth() + 1); };
+const weekStart = s => addDays(s, -parseD(s).getDay());
+
+/* ---------- storage ---------- */
+function defaultSupps() {
+  const t = todayS();
+  const mk = (id, name, dose, times) => ({ id, name, dose, times, freq: 'daily', n: 7, days: [], anchor: t, active: true });
+  return [
+    mk('nac', 'NAC', '', ['בוקר', 'ערב']),
+    mk('d', 'ויטמין D', '2 טיפות (2000 יח׳)', ['בוקר']),
+    mk('omega', 'אומגה 3 צמחי', '', ['בוקר']),
+    mk('turmeric', 'כורכום', '', ['בוקר']),
+    mk('c', 'ויטמין C', '', ['בוקר']),
+    mk('iron', 'ברזל', '', ['בוקר']),
+    mk('b12', 'B12', '', ['בוקר']),
+    mk('mg', 'מגנזיום', '', ['בוקר']),
+    mk('folic', 'חומצה פולית', '', ['בוקר'])
+  ];
+}
+function freshData() { return { v: 1, days: {}, foodLib: {}, supps: defaultSupps(), settings: { cycleLen: 28 } }; }
+
+let DATA;
+function load() {
+  try { DATA = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { DATA = null; }
+  if (!DATA || !DATA.days) DATA = freshData();
+  DATA.foodLib = DATA.foodLib || {};
+  DATA.supps = DATA.supps || defaultSupps();
+  DATA.settings = DATA.settings || { cycleLen: 28 };
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(DATA)); }
+  catch (e) { toast('השמירה נכשלה — כדאי לשמור גיבוי מההגדרות'); }
+  invalidate();
+}
+function emptyDay() { return { bleed: '', extras: [], sleepH: '', sleepQ: '', entries: [], foods: [], craves: [], feel: 0, supp: {}, note: '' }; }
+function getDay(s) { return DATA.days[s] || emptyDay(); }
+function editDay(s) { if (!DATA.days[s]) DATA.days[s] = emptyDay(); return DATA.days[s]; }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+/* ---------- Workout Pro (read only) ---------- */
+const AREA_HE = { glutes: 'ישבן', quads: 'ירך קדמית', back: 'גב', core: 'בטן וליבה', upper_body: 'פלג גוף עליון', chest: 'חזה', shoulders: 'כתפיים', arms: 'זרועות' };
+let _workouts = null;
+function workoutsByDate() {
+  if (_workouts) return _workouts;
+  _workouts = {};
+  let log = [];
+  try { log = JSON.parse(localStorage.getItem(WORKOUT_KEY) || '[]'); } catch (e) { log = []; }
+  if (!Array.isArray(log)) log = [];
+  log.forEach(w => {
+    if (!w || !w.date) return;
+    const areas = new Set();
+    (w.exercises || []).forEach(ex => (ex.areas || []).forEach(a => areas.add(AREA_HE[a] || a)));
+    (_workouts[w.date] = _workouts[w.date] || []).push({
+      name: w.name || 'אימון', min: Math.round((w.totalSeconds || 0) / 60), cardio: w.kind === 'cardio', areas: [...areas]
+    });
+  });
+  return _workouts;
+}
+function workoutMin(s) { return (workoutsByDate()[s] || []).reduce((a, w) => a + w.min, 0); }
+
+/* ---------- cycle ---------- */
+let _cycle = null;
+function invalidate() { _cycle = null; _workouts = null; _metrics = {}; }
+const isBleed = b => b === 'קל' || b === 'בינוני' || b === 'כבד';
+function cycleInfo() {
+  if (_cycle) return _cycle;
+  const bleedDays = Object.keys(DATA.days).filter(s => isBleed(DATA.days[s].bleed)).sort();
+  const starts = [];
+  bleedDays.forEach((s, i) => { if (i === 0 || diffDays(bleedDays[i - 1], s) > 7) starts.push(s); });
+  const gaps = [];
+  for (let i = 1; i < starts.length; i++) { const g = diffDays(starts[i - 1], starts[i]); if (g >= 18 && g <= 50) gaps.push(g); }
+  let len = DATA.settings.cycleLen || 28;
+  if (gaps.length) { const g = gaps.slice(-6).sort((a, b) => a - b); len = g[Math.floor(g.length / 2)]; }
+  const periodLens = starts.map(st => { let n = 0; while (isBleed(getDay(addDays(st, n)).bleed)) n++; return n; }).filter(n => n > 0);
+  const plen = periodLens.length ? Math.round(periodLens.reduce((a, b) => a + b, 0) / periodLens.length) : 5;
+  _cycle = { starts, len, plen, n: starts.length };
+  return _cycle;
+}
+// returns {cd, phase, predicted} or null
+function cycleOf(s) {
+  const ci = cycleInfo();
+  if (!ci.starts.length) return null;
+  let last = null;
+  for (const st of ci.starts) { if (st <= s) last = st; else break; }
+  if (!last) return null;
+  let diff = diffDays(last, s);
+  let predicted = false;
+  const t = todayS();
+  if (s > t && diff >= ci.len) { diff = diff % ci.len; predicted = true; }
+  const cd = diff + 1;
+  const ov = ci.len - 14;
+  let phase = cd <= ci.plen ? 'men' : (Math.abs(cd - ov) <= 1 ? 'ov' : (cd < ov ? 'fol' : 'lut'));
+  if (s > t) predicted = true;
+  return { cd, phase, predicted, len: ci.len };
+}
+const PHASES = { men: ['וסת', '#B85C7E'], fol: ['זקיקי', '#F3E7EA'], ov: ['ביוץ (משוער)', '#DCA7BA'], lut: ['לוטאלי', '#E6DDEE'] };
+
+/* ---------- supplements ---------- */
+function suppDue(sp, s) {
+  if (!sp.active) return false;
+  if (sp.freq === 'daily') return true;
+  if (sp.freq === 'alt') return ((diffDays(sp.anchor || s, s) % 2) + 2) % 2 === 0;
+  if (sp.freq === 'days') return (sp.days || []).includes(parseD(s).getDay());
+  if (sp.freq === 'weekly') {
+    let cnt = 0; const ws = weekStart(s);
+    for (let x = ws; x < s; x = addDays(x, 1)) if (sp.times.some(tm => getDay(x).supp[sp.id + '|' + tm])) cnt++;
+    const takenToday = sp.times.some(tm => getDay(s).supp[sp.id + '|' + tm]);
+    return cnt < (sp.n || 1) || takenToday;
+  }
+  return true;
+}
+function freqText(sp) {
+  if (sp.freq === 'weekly') return (sp.n || 1) + ' פעמים בשבוע';
+  if (sp.freq === 'days') return 'בימים ' + ((sp.days || []).length ? sp.days.slice().sort().map(i => DAY_LETTERS[i]).join(' ') : '—');
+  return (FREQS.find(f => f[0] === sp.freq) || FREQS[0])[1];
+}
+function suppDayStats(s) {
+  let due = 0, done = 0;
+  DATA.supps.forEach(sp => {
+    if (!suppDue(sp, s)) return;
+    sp.times.forEach(tm => { due++; if (getDay(s).supp[sp.id + '|' + tm]) done++; });
+  });
+  return { due, done, pct: due ? Math.round(done / due * 100) : null };
+}
+
+/* ---------- daily metrics (used by calendar, charts, insights) ---------- */
+let _metrics = {};
+function metrics(s) {
+  if (_metrics[s]) return _metrics[s];
+  const d = getDay(s);
+  const ents = d.entries.slice().sort((a, b) => a.t.localeCompare(b.t));
+  const moods = ents.filter(e => e.kind === 'mood');
+  const scores = moods.map(e => e.score).filter(Boolean);
+  const famW = {};
+  moods.forEach(e => (e.emos || []).forEach(w => { const f = famOfWord(w); if (f) famW[f.id] = (famW[f.id] || 0) + 1 + INTENSITY.indexOf(e.intensity || 'בינונית'); }));
+  let dom = null, best = 0;
+  Object.keys(famW).forEach(k => { if (famW[k] > best) { best = famW[k]; dom = k; } });
+  const maxOf = (kind, f) => { const v = ents.filter(e => e.kind === kind).map(f).filter(x => x != null); return v.length ? Math.max(...v) : null; };
+  const m = {
+    has: ents.length > 0 || !!d.bleed || d.foods.length > 0 || !!d.feel || !!d.sleepH,
+    hasEntries: ents.length > 0,
+    mood: scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null,
+    moodSeq: scores,
+    emo: dom, famW,
+    energy: (() => { const v = moods.map(e => Number(e.energy)).filter(Boolean); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; })(),
+    pain: maxOf('pain', e => e.pain),
+    belly: maxOf('belly', e => SEVERITY.indexOf(e.sev) + 1),
+    sym: maxOf('other', e => SEVERITY.indexOf(e.sev) + 1),
+    stool: ents.filter(e => e.kind === 'stool').map(e => e.bristol),
+    feel: d.feel || null,
+    fit: workoutMin(s),
+    supp: suppDayStats(s).pct,
+    bleed: d.bleed,
+    sleep: d.sleepH ? SLEEP_H_NUM[SLEEP_H.indexOf(d.sleepH)] : null,
+    cats: (() => { const set = new Set(); d.foods.forEach(f => ((DATA.foodLib[f.name] || {}).cats || []).forEach(c => set.add(c))); return set; })(),
+    foodsLogged: d.foods.length > 0
+  };
+  _metrics[s] = m;
+  return m;
+}
+
+/* ---------- small helpers ---------- */
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
+function lum(hex) {
+  const h = hex.replace('#', ''); const v = [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16) / 255).map(c => c <= .03928 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4));
+  return .2126 * v[0] + .7152 * v[1] + .0722 * v[2];
+}
+function fgFor(bg) { const L = lum(bg); return (1.05 / (L + .05)) >= ((L + .05) / (lum(DARK) + .05)) ? WHITE : DARK; }
+function toast(msg) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; t.setAttribute('role', 'status');
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2600);
+}
+function download(name, text) {
+  const blob = new Blob([text], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+const fmt1 = x => x == null ? '—' : (Math.round(x * 10) / 10).toString();
+
+/* =====================================================================
+   UI state, rendering and actions
+   ===================================================================== */
+const S = {
+  tab: 'cal', month: todayS().slice(0, 7), layer: 'mood', moodMode: 'score', sel: todayS(),
+  day: null,            // date string when the day screen is open
+  slot: 'כל היום', prep: 'ביתי', pending: null,   // food entry state
+  comp: null,           // entry composer state
+  suppOpen: null, libOpen: false
+};
+
+const $view = document.getElementById('view');
+const $sheet = document.getElementById('sheet');
+const $panel = document.getElementById('sheetPanel');
+
+const chip = (label, on, act, a, extra) =>
+  `<button type="button" class="chip${extra ? ' ' + extra : ''}" aria-pressed="${on ? 'true' : 'false'}" data-act="${act}" data-a="${esc(a)}">${esc(label)}</button>`;
+const chips = (list, isOn, act) => `<div class="wrap">${list.map(x => chip(x, isOn(x), act, x)).join('')}</div>`;
+const ICON = {
+  back: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
+  fwd: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>',
+  x: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  check: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>',
+  dumbbell: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 8v8M18 8v8M3 10v4M21 10v4M6 12h12"/></svg>'
+};
+
+/* ---------------- calendar layers ---------------- */
+const RAMP = {
+  pain: [[0, '#F4EEF5'], [2, '#DDC9E3'], [4, '#B48CC0'], [6, '#7E4C91'], [10, '#45215A']],
+  belly: ['#EBC9A6', '#D79A68', '#A35A2E', '#7A3F1E'],
+  sym: ['#E9D6DC', '#C9A0AE', '#9A6478', '#6B3A4E'],
+  supp: [[49, '#F4EEDD'], [79, '#E5CF94'], [99, '#C9A24A'], [100, '#8F6B1E']]
+};
+const LAYERS = [
+  ['mood', 'מצב רוח'], ['pain', 'כאב'], ['belly', 'בטן'], ['sym', 'תסמינים'], ['food', 'אוכל'],
+  ['fit', 'כושר'], ['cycle', 'מחזור'], ['supp', 'תוספים'], ['sleep', 'שינה']
+];
+function effLayer() { return S.layer === 'mood' && S.moodMode === 'kind' ? 'emo' : S.layer; }
+function layerColor(L, s) {
+  const m = metrics(s);
+  switch (L) {
+    case 'mood': return m.mood != null ? MOOD_DIV[Math.min(4, Math.max(0, Math.round(m.mood) - 1))] : null;
+    case 'emo': return m.emo ? famById(m.emo).c : null;
+    case 'pain': if (m.pain == null) return null; return RAMP.pain.find(r => m.pain <= r[0])[1];
+    case 'belly': return m.belly ? RAMP.belly[m.belly - 1] : null;
+    case 'sym': return m.sym ? RAMP.sym[m.sym - 1] : null;
+    case 'food': return m.feel ? MOOD_DIV[m.feel - 1] : null;
+    case 'fit': { const v = m.fit; if (!v) return null; return v < 30 ? '#C9D8EC' : v < 45 ? '#8FAED6' : '#3F6FA8'; }
+    case 'cycle': { const c = cycleOf(s); return c ? PHASES[c.phase][1] : null; }
+    case 'supp': { if (m.supp == null || !DATA.days[s]) return null; return RAMP.supp.find(r => m.supp <= r[0])[1]; }
+    case 'sleep': { if (m.sleep == null) return null; return ['#F4E3E8', '#E4C2CF', '#C9D8EC', '#8FAED6', '#3F6FA8'][SLEEP_H_NUM.indexOf(m.sleep)]; }
+  }
+  return null;
+}
+function layerLegend(L) {
+  switch (L) {
+    case 'mood': return MOOD_DIV.map((c, i) => [c, i === 0 ? '1 · קשה' : i === 4 ? '5 · מצוין' : String(i + 1)]);
+    case 'emo': return FAM_LEGEND.map(id => [famById(id).c, famById(id).name]);
+    case 'pain': return [['#F4EEF5', '0'], ['#DDC9E3', '1–2'], ['#B48CC0', '3–4'], ['#7E4C91', '5–6'], ['#45215A', '7–10']];
+    case 'belly': return RAMP.belly.map((c, i) => [c, SEVERITY[i]]);
+    case 'sym': return RAMP.sym.map((c, i) => [c, SEVERITY[i]]);
+    case 'food': return MOOD_DIV.map((c, i) => [c, i === 0 ? 'הרגשתי רע' : i === 4 ? 'הרגשתי מצוין' : String(i + 1)]);
+    case 'fit': return [['#C9D8EC', 'עד 30 דק׳'], ['#8FAED6', '30–44'], ['#3F6FA8', '45+']];
+    case 'cycle': return Object.values(PHASES).map(p => [p[1], p[0]]);
+    case 'supp': return [['#F4EEDD', 'פחות מ-50%'], ['#E5CF94', '50–79%'], ['#C9A24A', '80–99%'], ['#8F6B1E', '100%']];
+    case 'sleep': return SLEEP_H.map((h, i) => [['#F4E3E8', '#E4C2CF', '#C9D8EC', '#8FAED6', '#3F6FA8'][i], h]);
+  }
+  return [];
+}
+const LAYER_NOTE = {
+  mood: 'רקע: ממוצע היום · פס עליון: מצב הרוח לאורך היום, מבוקר (ימין) לערב (שמאל)',
+  emo: 'המשפחה הרגשית הדומיננטית של היום',
+  pain: 'הכאב החזק ביותר שתועד באותו יום', belly: 'תסמין הבטן החזק ביותר שתועד באותו יום',
+  sym: 'התסמין הכללי החזק ביותר שתועד באותו יום', food: 'הדירוג "איך הרגשתי עם האוכל"',
+  fit: 'נשאב אוטומטית מ-Workout Pro', cycle: 'מחושב מימי הדימום · ימים עתידיים הם תחזית',
+  supp: 'אחוז המנות שנלקחו מתוך מה שמתוכנן לאותו יום', sleep: 'שעות שינה בלילה שלפני'
+};
+
+function renderCal() {
+  const [y, mo] = S.month.split('-').map(Number);
+  const first = new Date(y, mo - 1, 1, 12);
+  const days = new Date(y, mo, 0).getDate();
+  const L = effLayer();
+  const t = todayS();
+  let cells = '';
+  for (let i = 0; i < first.getDay(); i++) cells += '<button class="cal-cell empty" tabindex="-1" aria-hidden="true"></button>';
+  for (let d = 1; d <= days; d++) {
+    const s = y + '-' + pad(mo) + '-' + pad(d);
+    const bg = layerColor(L, s);
+    const fg = bg ? fgFor(bg) : DARK;
+    const m = metrics(s);
+    const c = cycleOf(s);
+    let inner = `<span>${d}</span>`;
+    if (L === 'mood' && m.moodSeq.length > 1) inner = `<span class="cal-strip" aria-hidden="true">${m.moodSeq.slice(0, 8).map(v => `<i style="background:${MOOD_DIV[v - 1]}"></i>`).join('')}</span>` + inner;
+    if (L !== 'cycle') {
+      if (isBleed(m.bleed)) inner += '<span class="cal-bleed" aria-hidden="true"></span>';
+      else if (s > t && c && c.phase === 'men') inner += '<span class="cal-bleed pred" aria-hidden="true"></span>';
+    }
+    const cls = ['cal-cell', s === t ? 'today' : '', s === S.sel ? 'sel' : '', s > t && !(L === 'cycle') ? 'future' : ''].join(' ');
+    cells += `<button type="button" class="${cls}" style="background:${bg || '#fff'};color:${fg}${s > t && L === 'cycle' ? ';opacity:.6' : ''}" data-act="selDay" data-a="${s}" aria-label="${d} ב${MONTHS[mo - 1]}${s === t ? ', היום' : ''}">${inner}</button>`;
+  }
+  const legend = layerLegend(L).map(([c, l]) => `<span class="row xs" style="gap:5px;color:var(--ink2)"><span class="sw" style="background:${c}"></span>${esc(l)}</span>`).join('');
+  $view.innerHTML = `
+    <div class="between" style="padding-top:18px">
+      <h1>${MONTHS[mo - 1]} ${y}</h1>
+      <div class="row" style="gap:0">
+        <button class="chip" style="min-height:36px;margin-left:4px" data-act="goToday">היום</button>
+        <button class="iconbtn" aria-label="חודש קודם" data-act="month" data-a="-1">${ICON.back}</button>
+        <button class="iconbtn" aria-label="חודש הבא" data-act="month" data-a="1">${ICON.fwd}</button>
+      </div>
+    </div>
+    <div class="small muted" style="font-weight:600;margin:8px 0 6px">צביעה לפי</div>
+    <div class="layers">${LAYERS.map(l => chip(l[1], S.layer === l[0], 'layer', l[0])).join('')}</div>
+    ${S.layer === 'mood' ? `<div class="seg" style="margin-bottom:8px"><button aria-pressed="${S.moodMode === 'score'}" data-act="moodMode" data-a="score">ציון</button><button aria-pressed="${S.moodMode === 'kind'}" data-act="moodMode" data-a="kind">סוג רגש</button></div>` : ''}
+    <div class="xs muted" style="margin-bottom:6px">${LAYER_NOTE[L]}</div>
+    <div class="wrap" style="gap:6px 12px;margin-bottom:12px">${legend}</div>
+    <div class="grid7" style="margin-bottom:6px">${DAY_LETTERS.map(l => `<div class="xs muted" style="text-align:center;font-weight:700">${l}</div>`).join('')}</div>
+    <div class="grid7">${cells}</div>
+    <div class="row xs" style="gap:6px;margin-top:8px;color:var(--ink2)"><span class="dot" style="width:7px;height:7px;background:var(--rose)"></span>יום דימום<span class="dot" style="width:7px;height:7px;border:1.5px solid var(--rose);margin-right:10px"></span>וסת צפויה</div>
+    ${selCard(S.sel)}`;
+}
+function selCard(s) {
+  const m = metrics(s), c = cycleOf(s), d = getDay(s);
+  const st = (k, v) => `<div class="stat"><span>${k}</span><b>${v}</b></div>`;
+  const supp = suppDayStats(s);
+  return `<div class="card">
+    <div class="between"><div class="serif" style="font-size:18px;font-weight:700">${fmtLong(s)}</div>
+    ${c ? `<div class="small" style="color:var(--accent);font-weight:700">יום ${c.cd} במחזור${c.predicted ? ' (צפוי)' : ''}</div>` : ''}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px">
+      ${st('מצב רוח', m.mood != null ? fmt1(m.mood) + '/5' : '—')}
+      ${st('רגש דומיננטי', m.emo ? famById(m.emo).name.split(' ')[0] : '—')}
+      ${st('כאב', m.pain != null ? m.pain + '/10' : '—')}
+      ${st('בטן', m.belly ? SEVERITY[m.belly - 1] : '—')}
+      ${st('כושר', m.fit ? m.fit + ' דק׳' : '—')}
+      ${st('תוספים', DATA.days[s] && supp.pct != null ? supp.pct + '%' : '—')}
+      ${st('דימום', d.bleed && d.bleed !== 'אין' ? d.bleed : '—')}
+      ${st('שינה', d.sleepH || '—')}
+      ${st('רשומות', d.entries.length)}
+    </div>
+    <button class="btn block" style="margin-top:12px" data-act="openDay" data-a="${s}">פתיחת היום והזנה</button>
+  </div>`;
+}
+
+/* ---------------- day screen ---------------- */
+function renderDay() {
+  const s = S.day, d = getDay(s), c = cycleOf(s), m = metrics(s);
+  const ents = d.entries.slice().sort((a, b) => a.t.localeCompare(b.t));
+  const painVals = ents.filter(e => e.kind === 'pain').map(e => e.pain);
+  $view.innerHTML = `
+    <div class="between" style="padding-top:10px">
+      <button class="chip" style="border:none;background:none;color:var(--accent);padding:0" data-act="back">${ICON.back} חזרה ללוח</button>
+      <div class="row" style="gap:0">
+        <button class="iconbtn" aria-label="יום קודם" data-act="dayNav" data-a="-1">${ICON.back}</button>
+        <button class="iconbtn" aria-label="יום הבא" data-act="dayNav" data-a="1">${ICON.fwd}</button>
+      </div>
+    </div>
+    <h1>${fmtLong(s)}</h1>
+    ${c ? `<div class="row small" style="display:inline-flex;margin-top:8px;padding:5px 12px;border-radius:14px;background:#F3E7EA;color:#8E2F52;font-weight:700"><span class="dot" style="width:7px;height:7px;background:var(--rose)"></span>יום ${c.cd} במחזור${c.predicted ? ' (צפוי)' : ''}</div>` : `<div class="xs muted" style="margin-top:6px">יום במחזור יחושב אוטומטית אחרי שתסמני ימי דימום</div>`}
+
+    <section class="card">
+      <h2>מחזור</h2>
+      <div class="lbl">דימום</div>${chips(BLEED, x => (d.bleed || 'אין') === x, 'bleed')}
+      <div class="lbl">נוסף (לא חובה)</div>${chips(CYCLE_EXTRAS, x => d.extras.includes(x), 'extra')}
+    </section>
+
+    <section class="card">
+      <h2>שינה (הלילה שעבר)</h2>
+      <div class="lbl">כמה שעות?</div>${chips(SLEEP_H, x => d.sleepH === x, 'sleepH')}
+      <div class="lbl">איכות</div>${chips(SLEEP_Q, x => d.sleepQ === x, 'sleepQ')}
+    </section>
+
+    <section class="card">
+      <h2 style="margin-bottom:2px">רשומות לאורך היום</h2>
+      <div class="small muted" style="margin-bottom:12px">מצב רוח, כאב, בטן, יציאות ותסמינים — כמה שרוצים</div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:6px">
+        <div class="stat"><span>מצב רוח ממוצע</span><b>${m.mood != null ? fmt1(m.mood) + '/5' : '—'}</b></div>
+        <div class="stat"><span>כאב מקסימלי</span><b>${painVals.length ? Math.max(...painVals) + '/10' : '—'}</b></div>
+        <div class="stat"><span>רשומות</span><b>${ents.length}</b></div>
+      </div>
+      ${ents.map(entryRow).join('')}
+      <button class="btn soft block" style="margin-top:10px" data-act="newEntry">+ רשומה חדשה</button>
+    </section>
+
+    ${suppCard(s)}
+    ${foodCard(s)}
+    ${fitCard(s)}
+
+    <section class="card">
+      <label for="dayNote" style="display:block;font-size:17px;font-weight:700;margin-bottom:10px">הערה ליום</label>
+      <textarea id="dayNote" class="input" rows="3" placeholder="משהו שכדאי לזכור על היום הזה…" data-input="dayNote">${esc(d.note)}</textarea>
+    </section>
+    <button class="btn block" style="margin-top:16px" data-act="back">סיום</button>`;
+}
+function entrySummary(e) {
+  if (e.kind === 'mood') {
+    const title = (e.emos || []).length ? e.emos.join(', ') : 'מצב רוח ' + e.score + ' · ' + MOOD_LABELS[e.score - 1];
+    const sub = [(e.emos || []).length ? e.intensity : null, e.score ? 'ציון ' + e.score : null, e.energy ? 'אנרגיה ' + e.energy : null].filter(Boolean).join(' · ');
+    const f = (e.emos || []).length ? famOfWord(e.emos[0]) : null;
+    return { title, sub, c: f ? f.c : KIND_C.mood };
+  }
+  if (e.kind === 'pain') return {
+    title: 'כאב ' + e.pain + '/10' + ((e.areas || []).length ? ' · ' + e.areas.join(', ') : ''),
+    sub: [(e.types || []).join(', '), e.impact, (e.when || []).length ? 'קשור ל: ' + e.when.join(', ') : '', (e.help || []).length ? 'עזר: ' + e.help.join(', ') : ''].filter(Boolean).join(' · '),
+    c: KIND_C.pain
+  };
+  if (e.kind === 'stool') return { title: 'יציאה · בריסטול ' + e.bristol, sub: BRISTOL[e.bristol - 1], c: BRISTOL_C[e.bristol - 1] };
+  const syms = (e.syms || []).join(', ');
+  return {
+    title: (e.kind === 'belly' ? 'בטן ועיכול' : 'תסמינים') + ' · ' + e.sev,
+    sub: [syms, e.temp ? 'שיא ' + e.temp + '°' : '', (e.when || []).length ? 'קשור ל: ' + e.when.join(', ') : '', (e.help || []).length ? 'עזר: ' + e.help.join(', ') : ''].filter(Boolean).join(' · '),
+    c: KIND_C[e.kind]
+  };
+}
+function entryRow(e) {
+  const x = entrySummary(e);
+  return `<button type="button" class="tl-item" style="width:100%;background:none;border-left:none;border-right:none;border-bottom:none;text-align:right" data-act="editEntry" data-a="${e.id}" aria-label="עריכת רשומה ${esc(e.t)}">
+    <span class="tl-time">${esc(e.t)}</span>
+    <span class="dot" style="background:${x.c};margin-top:7px"></span>
+    <span style="flex:1;min-width:0">
+      <span style="display:block;font-size:15px;font-weight:700">${esc(x.title)}</span>
+      ${x.sub ? `<span style="display:block;font-size:13px;color:var(--muted)">${esc(x.sub)}</span>` : ''}
+      ${e.note ? `<span style="display:block;font-size:13px;color:var(--ink2);font-style:italic;margin-top:2px">„${esc(e.note)}"</span>` : ''}
+    </span>
+  </button>`;
+}
+function suppCard(s) {
+  const d = getDay(s); const st = suppDayStats(s);
+  const rows = DATA.supps.filter(sp => sp.active).map(sp => {
+    const due = suppDue(sp, s);
+    const btns = sp.times.map(tm => {
+      const on = !!d.supp[sp.id + '|' + tm];
+      return `<button type="button" class="chip" style="min-height:40px;${on ? 'background:var(--gold);border-color:var(--gold);color:#fff' : ''}" aria-pressed="${on}" data-act="supp" data-a="${esc(sp.id + '|' + tm)}" aria-label="${esc(sp.name)}, ${tm}">${on ? ICON.check + ' ' : ''}${tm}</button>`;
+    }).join('');
+    return `<div class="between" style="padding:10px 0;border-top:1px solid var(--line2);opacity:${due ? 1 : .55}">
+      <div style="min-width:0"><div style="font-weight:700">${esc(sp.name)}</div><div class="xs muted">${esc([sp.dose, freqText(sp), due ? '' : 'לא מתוכנן היום'].filter(Boolean).join(' · '))}</div></div>
+      <div class="row" style="gap:6px;flex:0 0 auto">${btns}</div></div>`;
+  }).join('');
+  return `<section class="card">
+    <div class="between" style="margin-bottom:6px"><h2 style="margin:0">תוספי תזונה</h2><button class="chip" style="border:none;background:none;color:var(--accent);padding:0;font-weight:700" data-act="tab" data-a="settings">עריכת יעדים</button></div>
+    ${st.due ? `<div class="between small" style="font-weight:600;color:var(--ink2);margin-bottom:6px"><span>היום: ${st.done} מתוך ${st.due} מנות</span><span>${st.pct}%</span></div><div class="bar" style="margin-bottom:6px"><div style="width:${st.pct}%"></div></div>` : ''}
+    ${rows || '<div class="small muted">אין תוספים פעילים. אפשר להוסיף בהגדרות.</div>'}
+  </section>`;
+}
+function recentFoods() {
+  const cnt = {}; const t = todayS();
+  for (let i = 0; i < 45; i++) (getDay(addDays(t, -i)).foods || []).forEach(f => cnt[f.name] = (cnt[f.name] || 0) + 1);
+  return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]).slice(0, 12);
+}
+function foodCard(s) {
+  const d = getDay(s);
+  const groups = SLOTS.filter(sl => d.foods.some(f => f.slot === sl)).map(sl => `
+    <div style="padding:8px 0;border-bottom:1px solid var(--line2)">
+      <div class="small" style="font-weight:700;color:var(--accent);margin-bottom:4px">${sl}</div>
+      <div class="wrap">${d.foods.map((f, i) => f.slot === sl ? `<span class="row" style="gap:2px;background:var(--bg);border-radius:16px;padding:2px 4px 2px 10px;font-size:14px">${esc(f.name)}${f.prep && f.prep !== 'ביתי' ? ` <span class="xs muted">(${esc(f.prep)})</span>` : f.prep ? ' <span class="xs muted">(ביתי)</span>' : ''}<button class="iconbtn" style="width:32px;height:32px;color:var(--muted)" aria-label="הסרת ${esc(f.name)}" data-act="rmFood" data-a="${i}">${ICON.x}</button></span>` : '').join('')}</div>
+    </div>`).join('');
+  const p = S.pending;
+  const recent = recentFoods();
+  return `<section class="card">
+    <h2 style="margin-bottom:2px">אוכל</h2>
+    <div class="small muted" style="margin-bottom:4px">אפשר לפרט לפי ארוחות, או לרשום הכל בסוף היום</div>
+    <div class="lbl">מתי?</div>${chips(SLOTS, x => S.slot === x, 'slot')}
+    <div class="lbl">הכנה</div>${chips(PREP, x => S.prep === x, 'prep')}
+    <label class="lbl" for="foodIn" style="display:block">מה אכלת?</label>
+    <div class="row">
+      <input id="foodIn" class="input" list="foodList" placeholder="לדוגמה: פסטה עם רוטב עגבניות" autocomplete="off" enterkeyhint="done" data-enter="addFood">
+      <button class="btn" style="flex:0 0 auto" data-act="addFood">הוספה</button>
+    </div>
+    <datalist id="foodList">${[...new Set(Object.keys(DATA.foodLib).concat(Object.keys(FOOD_DICT)))].map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+    ${p ? `<div style="margin-top:10px;padding:12px;border-radius:12px;background:#FBF5E6;border:1px solid #EAD9AE">
+      <div style="font-weight:700">פריט חדש: ${esc(p.name)}</div>
+      <div class="small" style="color:var(--ink2);margin:2px 0 8px">${p.guessed ? 'זיהיתי את הקבוצות המסומנות. אפשר לתקן בלחיצה — שואלים רק בפעם הראשונה.' : 'לא זיהיתי אוטומטית. לאילו קבוצות הוא שייך? שואלים רק בפעם הראשונה.'}</div>
+      <div class="wrap">${FOOD_CATS.map(c => chip(c[1], p.cats.includes(c[0]), 'pcat', c[0])).join('')}</div>
+      <div class="row" style="margin-top:10px"><button class="btn" style="flex:1;background:var(--gold)" data-act="confirmFood">אישור</button><button class="btn ghost" data-act="skipFood">אחר כך</button></div>
+    </div>` : ''}
+    ${recent.length ? `<div class="lbl">הוספה מהירה</div><div class="wrap">${recent.map(n => `<button class="chip dashed" data-act="quickFood" data-a="${esc(n)}">+ ${esc(n)}</button>`).join('')}</div>` : ''}
+    ${groups ? `<div style="margin-top:12px;border-top:1px solid var(--line2)">${groups}</div>` : ''}
+    <div class="lbl">חשקים ורתיעות</div>${chips(CRAVES, x => d.craves.includes(x), 'crave')}
+    <div class="lbl">איך הרגשת עם האוכל היום?</div>
+    <div class="scale" style="grid-template-columns:repeat(5,minmax(0,1fr))">${[1, 2, 3, 4, 5].map(n => `<button aria-pressed="${d.feel === n}" style="background:${MOOD_DIV[n - 1]};color:${fgFor(MOOD_DIV[n - 1])}" data-act="feel" data-a="${n}" aria-label="תחושה ${n}">${n}</button>`).join('')}</div>
+    <div class="between xs muted" style="margin-top:4px"><span>רע</span><span>מצוין</span></div>
+  </section>`;
+}
+function fitCard(s) {
+  const ws = workoutsByDate()[s] || [];
+  return `<section class="card" style="background:var(--blue-soft);border-color:#D3DEEE">
+    <div class="between"><h2 style="margin:0">כושר</h2><span class="xs" style="font-weight:700;color:#2F5A8F">מ-Workout Pro</span></div>
+    ${ws.length ? ws.map(w => `<div class="row" style="gap:12px;margin-top:10px"><span style="width:44px;height:44px;border-radius:12px;background:#3F6FA8;color:#fff;display:flex;align-items:center;justify-content:center;flex:0 0 auto">${ICON.dumbbell}</span>
+      <div><div style="font-weight:700">${esc(w.name)} · ${w.min} דק׳</div>${w.areas.length ? `<div class="small" style="color:var(--ink2)">${esc(w.areas.join(', '))}</div>` : ''}</div></div>`).join('')
+      : '<div class="small" style="color:var(--ink2);margin-top:8px">לא תועד אימון ביום הזה.</div>'}
+  </section>`;
+}
+
+/* ---------------- entry composer (bottom sheet) ---------------- */
+function newComp(kind) {
+  return { id: null, kind: kind || 'mood', t: nowHM(), emos: [], intensity: 'בינונית', score: 3, energy: 3,
+    areas: [], pain: 5, types: [], when: [], help: [], impact: 'הפריע קצת', syms: [], sev: 'בינונית', temp: '', bristol: 4, note: '' };
+}
+function openSheet() { $sheet.classList.add('open'); document.body.style.overflow = 'hidden'; renderSheet(); }
+function closeSheet() { $sheet.classList.remove('open'); document.body.style.overflow = ''; S.comp = null; }
+function renderSheet() {
+  const c = S.comp; if (!c) return;
+  const keep = $panel.scrollTop;
+  const tog = (field, list) => `<div class="wrap">${list.map(x => chip(x, c[field].includes(x), 'cToggle', field + '::' + x)).join('')}</div>`;
+  const one = (field, list) => `<div class="wrap">${list.map(x => chip(x, c[field] === x, 'cSet', field + '::' + x)).join('')}</div>`;
+  let body = '';
+  if (c.kind === 'mood') {
+    body = `<div class="lbl">מה מרגישים? (אפשר כמה)</div>
+      ${FAMS.map(f => `<div class="fam-title"><span class="dot" style="background:${f.c}"></span>${f.name}</div>
+        <div class="wrap">${f.items.map(w => { const on = c.emos.includes(w); return `<button type="button" class="chip" aria-pressed="${on}" style="${on ? `background:${f.c};border-color:${f.c};color:${fgFor(f.c)}` : ''}" data-act="cToggle" data-a="emos::${esc(w)}">${esc(w)}</button>`; }).join('')}</div>`).join('')}
+      <div class="lbl">עוצמה</div>${one('intensity', INTENSITY)}
+      <div class="lbl">ציון כללי</div>
+      <div class="scale" style="grid-template-columns:repeat(5,minmax(0,1fr))">${[1, 2, 3, 4, 5].map(n => `<button aria-pressed="${c.score === n}" style="background:${MOOD_DIV[n - 1]};color:${fgFor(MOOD_DIV[n - 1])}" data-act="cNum" data-a="score::${n}">${n}<span style="display:block;font-size:11px;font-weight:600">${MOOD_LABELS[n - 1]}</span></button>`).join('')}</div>
+      <div class="lbl">אנרגיה</div>
+      <div class="scale" style="grid-template-columns:repeat(5,minmax(0,1fr))">${[1, 2, 3, 4, 5].map(n => `<button aria-pressed="${c.energy === n}" style="background:#fff;border:1px solid var(--chipline)" data-act="cNum" data-a="energy::${n}">${n}</button>`).join('')}</div>
+      <div class="between xs muted" style="margin-top:4px"><span>מותשת</span><span>מלאת אנרגיה</span></div>`;
+  } else if (c.kind === 'pain') {
+    const pc = v => RAMP.pain.find(r => v <= r[0])[1];
+    body = `<div class="lbl">איפה?</div>${tog('areas', PAIN_AREAS)}
+      <div class="between lbl"><span>עוצמה</span><b style="color:var(--accent);font-size:15px">${c.pain}/10</b></div>
+      <div class="scale" style="grid-template-columns:repeat(11,minmax(0,1fr));gap:3px">${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `<button aria-pressed="${c.pain === n}" style="background:${pc(n)};color:${fgFor(pc(n))};font-size:13px;padding:0;outline-color:#E0A458" data-act="cNum" data-a="pain::${n}" aria-label="עוצמה ${n}">${n}</button>`).join('')}</div>
+      <div class="lbl">סוג הכאב</div>${tog('types', PAIN_TYPES)}
+      <div class="lbl">השפעה על התפקוד</div>
+      <div style="display:grid;gap:6px">${PAIN_IMPACT.map(x => chip(x, c.impact === x, 'cSet', 'impact::' + x)).join('')}</div>
+      <div class="lbl">קשור ל… (לא חובה)</div>${tog('when', PAIN_WHEN)}
+      <div class="lbl">מה עזר? (לא חובה)</div>${tog('help', PAIN_HELP)}`;
+  } else if (c.kind === 'belly') {
+    body = `<div class="lbl">מה מרגישים?</div>${tog('syms', BELLY_SYMS)}
+      <div class="lbl">חומרה</div>${one('sev', SEVERITY)}
+      <div class="lbl">קשור ל… (לא חובה)</div>${tog('when', BELLY_WHEN)}
+      <div class="lbl">מה עזר? (לא חובה)</div>${tog('help', BELLY_HELP)}`;
+  } else if (c.kind === 'stool') {
+    body = `<div class="lbl">סולם בריסטול — מה הכי מתאים?</div>
+      <div class="bristol" style="display:grid;gap:6px">${BRISTOL.map((b, i) => `<button type="button" aria-pressed="${c.bristol === i + 1}" data-act="cNum" data-a="bristol::${i + 1}"><span class="n" style="background:${BRISTOL_C[i]}">${i + 1}</span>${b}</button>`).join('')}</div>`;
+  } else {
+    body = `<div class="lbl">אילו תסמינים?</div>
+      ${GEN_GROUPS.map(g => `<div class="fam-title" style="color:var(--ink2)">${g[0]}</div>${tog('syms', g[1])}`).join('')}
+      ${c.syms.includes('חום') ? `<label class="lbl" for="cTemp" style="display:block">טמפרטורת שיא היום (°C, לא חובה)</label>
+        <input id="cTemp" class="input" style="width:150px;background:#fff" type="number" inputmode="decimal" step="0.1" min="35" max="43" placeholder="לדוגמה: 38.2" value="${esc(c.temp)}" data-input="cTemp">` : ''}
+      <div class="lbl">חומרה</div>${one('sev', SEVERITY)}`;
+  }
+  const kinds = [['mood', 'מצב רוח'], ['pain', 'כאב'], ['belly', 'בטן ועיכול'], ['stool', 'יציאה'], ['other', 'תסמינים אחרים']];
+  $panel.innerHTML = `
+    <div class="between"><h2 style="margin:0">${c.id ? 'עריכת רשומה' : 'רשומה חדשה'}</h2><button class="iconbtn" aria-label="סגירה" data-act="cClose">${ICON.x}</button></div>
+    <div class="row" style="margin:6px 0 12px"><label for="cTime" class="small muted">שעה</label><input id="cTime" type="time" class="input" style="width:130px;background:#fff" value="${esc(c.t)}" data-input="cTime"></div>
+    ${c.id ? '' : `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px">${kinds.map(k => `<button type="button" class="chip" style="border-radius:10px;padding:0 6px" aria-pressed="${c.kind === k[0]}" data-act="cKind" data-a="${k[0]}">${k[1]}</button>`).join('')}</div>`}
+    ${body}
+    <label class="lbl" for="cNote" style="display:block">הערה (לא חובה)</label>
+    <textarea id="cNote" class="input" style="background:#fff" rows="2" placeholder="לדוגמה: בעיקר בשעות הערב המוקדמות" data-input="cNote">${esc(c.note)}</textarea>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" style="flex:1" data-act="cSave">${c.id ? 'שמירה' : 'הוספה'}</button>
+      ${c.id ? `<button class="btn ghost" style="color:#A3324A" data-act="cDelete">מחיקה</button>` : `<button class="btn ghost" data-act="cClose">ביטול</button>`}
+    </div>`;
+  $panel.scrollTop = keep;
+}
+function compToEntry(c) {
+  const base = { id: c.id || uid(), t: c.t || nowHM(), kind: c.kind, note: (c.note || '').trim() };
+  if (c.kind === 'mood') return Object.assign(base, { emos: c.emos, intensity: c.intensity, score: c.score, energy: c.energy });
+  if (c.kind === 'pain') return Object.assign(base, { areas: c.areas, pain: c.pain, types: c.types, impact: c.impact, when: c.when, help: c.help });
+  if (c.kind === 'stool') return Object.assign(base, { bristol: c.bristol });
+  if (c.kind === 'belly') return Object.assign(base, { syms: c.syms, sev: c.sev, when: c.when, help: c.help });
+  return Object.assign(base, { syms: c.syms, sev: c.sev, temp: c.syms.includes('חום') ? c.temp : '' });
+}
+
+/* =====================================================================
+   Built-in food dictionary: common foods → groups.
+   Used to pre-fill groups for a new food; the user confirms with one tap.
+   Also matched by parts of a name ("פסטה ביתית ברוטב עגבניות" → פסטה).
+   ===================================================================== */
+const FOOD_DICT = (() => {
+  const G = 'gluten', D = 'dairy', E = 'eggs', SU = 'sugar', CA = 'caffeine', F = 'fried', LE = 'legumes', O = 'onion',
+    SP = 'spicy', AL = 'alcohol', SA = 'salty', V = 'veg', FR = 'fruit', P = 'processed';
+  const d = {};
+  const add = (cats, names) => names.split('|').forEach(n => d[n] = cats);
+  // breads & baked
+  add([G], 'לחם|לחם מחמצת|לחם מלא|לחם לבן|פיתה|לאפה|בגט|חלה|טוסט|פרוסה|קרקרים|לחמניה|לחמנייה|בייגל|קרואסון|מצה|פריכיות|טורטייה|טורטיה|פתיתים|קוסקוס|בורגול|פסטה|ספגטי|ניוקי|אטריות|נודלס|לזניה|פנקייק|וופל|פיצה|בצק|כופתאות|רביולי|פוקאצ׳ה|פוקצ׳ה');
+  add([G, D], 'טוסט גבינה|פסטה ברוטב שמנת|לזניה|פיצה|מאפה גבינה|בורקס גבינה|גבינה ולחם');
+  add([G, F], 'בורקס|בורקס תפוח אדמה|ג׳חנון|מלאווח|שניצל|שניצל עוף|קובה|סמבוסק|קרפ');
+  add([G, D, F], 'בורקס גבינה|מלאווח עם גבינה');
+  add([G, SU], 'עוגה|עוגיות|עוגייה|עוגיות שיבולת שועל|מאפה|רוגלך|בבקה|עוגת שמרים|מאפין|דונאט|סופגניה|סופגנייה|ביסקוויט|ופלים|קרואסון שוקולד|עוגת שוקולד|עוגת גבינה|עוגת תפוחים|פאי|טארט|בראוניז|חטיף דגנים|דגני בוקר');
+  add([G, SU, D], 'עוגת גבינה|קרם פטיסייר|עוגת קרם');
+  // dairy
+  add([D], 'גבינה|גבינה צהובה|גבינה לבנה|קוטג׳|קוטג|לבנה|לבנייה|פטה|בולגרית|מוצרלה|פרמזן|ריקוטה|שמנת|שמנת חמוצה|יוגורט|יוגורט יווני|חלב|חמאה|גבינת שמנת|מעדן|קפיר|אשל|גיל|צפתית|חלומי');
+  add([D, SU], 'גלידה|מעדן חלב|פודינג|מילקשייק|שוקו|יוגורט פירות');
+  add([D, CA], 'קפה הפוך|הפוך|לאטה|קפוצ׳ינו|קפה עם חלב|נס קפה');
+  // eggs
+  add([E], 'ביצה|ביצים|ביצה קשה|חביתה|ביצה עין|ביצים מקושקשות|שקשוקה ביצים');
+  add([E, V, O], 'שקשוקה|פריטטה|חביתת ירק');
+  add([E, D], 'קיש|פשטידה|חביתה עם גבינה');
+  // sweets
+  add([SU], 'שוקולד|שוקולד מריר|שוקולד חלב|ממתקים|סוכריות|סוכר|דבש|ריבה|ממרח שוקולד|נוטלה|חלבה|תמרים|סילאן|מרשמלו|קרמבו|במבה נוגט|גומי|סורבה|ארטיק');
+  add([SU, D], 'שוקולד חלב');
+  // caffeine
+  add([CA], 'קפה|אספרסו|קפה שחור|תה|תה ירוק|קולה|קוקה קולה|משקה אנרגיה|מאצ׳ה|קפה קר|אייס קפה|ארל גריי');
+  add([CA, SU], 'קולה|אייס קפה|קפה קר מתוק');
+  // fried / fatty
+  add([F], 'צ׳יפס|טוגנים|ציפס|פלאפל|לביבות|המבורגר|נקניקיות|נקניקייה|כנפיים|עוף מטוגן|שווארמה|טמפורה|ספרינג רול|פיש אנד צ׳יפס');
+  add([F, LE], 'פלאפל|פלאפל בפיתה');
+  add([F, P], 'נקניקיות|נקניקייה|המבורגר|שניצל תירס|נאגטס|שניצל מוכן');
+  // legumes
+  add([LE], 'חומוס|חומוס גרגרים|עדשים|מרק עדשים|שעועית|שעועית לבנה|שעועית ירוקה|אפונה|פול|מש|טופו|אדממה|סויה|מג׳דרה|תבשיל שעועית');
+  add([LE, O], 'מג׳דרה|מרק עדשים|חומוס עם בצל');
+  // onion & garlic
+  add([O], 'בצל|שום|בצל ירוק|שאלוט|כרשה|בצל מטוגן|שום קלוי|ממרח שום');
+  add([O, V], 'מרק ירקות|מרק עוף|סלט ירקות');
+  // spicy
+  add([SP], 'סחוג|חריף|צ׳ילי|חריסה|פלפל חריף|ארנבייטה|טבסקו|קארי חריף|זחוג');
+  // alcohol
+  add([AL], 'יין|בירה|וודקה|ערק|קוקטייל|וויסקי|ג׳ין|למונצ׳לו|סיידר|שמפניה');
+  // salty snacks
+  add([SA, P], 'במבה|ביסלי|צ׳יפס שקית|חטיף מלוח|פרינגלס|דוריטוס|בייגלה|קרקר מלוח|תפוצ׳יפס|אפרופו|פופקורן|גרעינים|בוטנים|פיסטוקים|שקדים מלוחים|קשיו');
+  // processed
+  add([P], 'נקניק|פסטרמה|סלמי|קבנוס|מנה חמה|אטריות אינסטנט|רטבים מוכנים|קטשופ|מיונז|שניצל קפוא|פיצה קפואה|נאגטס|דגני בוקר ממותקים|חטיף אנרגיה|משקה ממותק|מיץ');
+  add([P, SU], 'מיץ|משקה ממותק|חטיף אנרגיה');
+  // vegetables
+  add([V], 'סלט|סלט ירקות|ירקות|מלפפון|עגבנייה|עגבניה|עגבניות|גזר|פלפל|חסה|ברוקולי|כרובית|כרוב|קישוא|קישואים|חציל|חצילים|תרד|בטטה|תפוח אדמה|תפוחי אדמה|דלעת|סלק|פטריות|אבוקדו|תירס|ארטישוק|צנונית|סלרי|ירקות מוקפצים|ירקות בתנור|מרק ירקות');
+  add([V, O], 'סלט ישראלי|סלט קצוץ|לקט ירקות|ירקות מוקפצים|רטטוי|מרק ירקות');
+  add([V, LE], 'אדממה|שעועית ירוקה|אפונה');
+  // fruit
+  add([FR], 'פרי|פירות|תפוח|בננה|תפוז|קלמנטינה|אגס|ענבים|תותים|אבטיח|מלון|מנגו|אננס|קיווי|אפרסק|נקטרינה|שזיף|אוכמניות|פטל|דובדבנים|רימון|אפרסמון|ליצ׳י|פומלה|אשכולית|לימון|תאנים|משמש|סלט פירות');
+  add([FR, SU], 'פירות יבשים|צימוקים|משמש מיובש|מנגו מיובש|תמרים');
+  // mixed dishes
+  add([G, V, O], 'פסטה ברוטב עגבניות|ספגטי ברוטב|פסטה ברוטב');
+  add([G, D, E], 'פנקייק|וופל בלגי|פרנץ׳ טוסט|קרפ מתוק');
+  add([LE, O, V], 'חומוס פול|מרק אפונה');
+  add([V, O], 'מרק');
+  add([D, V], 'סלט יווני');
+  add([G, LE, F], 'פלאפל בפיתה|סביח');
+  add([G, E, F, V], 'סביח');
+  add([G, O], 'בורגר צמחוני');
+  add([G, SU, D, E], 'עוגת גבינה|פנקייק');
+  add([], 'אורז|אורז לבן|אורז מלא|קינואה|עוף|חזה עוף|פרגיות|הודו|בשר|סטייק|קציצות|דג|סלמון|טונה|אמנון|דניס|שיבולת שועל|דייסת שיבולת שועל|טחינה|שקדים|אגוזים|אגוזי מלך|זרעי צ׳יה|גרנולה|כוסמת|מים|סודה|תה צמחים|ממרח אגוזים|חמאת בוטנים');
+  add([G], 'שיבולת שועל|דייסת שיבולת שועל|גרנולה'); // oats are commonly cross-contaminated; user can untick
+  add([SU, G], 'גרנולה');
+  add([LE], 'חמאת בוטנים');
+  add([G, E, F, V, LE], 'סביח');
+  return d;
+})();
+// extra hints by word fragments inside a free-text name
+const FOOD_HINTS = [
+  [/גבינ|שמנת|יוגורט|חלב(?!ה)|חמאה|פטה|מוצרלה|פרמז|קוטג|לבנ/, 'dairy'], [/לחם|פיתה|פסטה|בצק|קמח|טוסט|לחמני|מאפ|עוג|קרקר|בורקס/, 'gluten'],
+  [/שוקולד|מתוק|סוכר|ממתק|ריבה|דבש|עוגי|עוג/, 'sugar'], [/קפה|אספרסו|לאטה|הפוך|תה (?!צמח)|קולה/, 'caffeine'],
+  [/מטוגן|טוגנ|צ׳יפס|שניצל|פלאפל/, 'fried'], [/חומוס|עדש|שעועית|אפונה|טופו|סויה/, 'legumes'],
+  [/בצל|שום|כרשה/, 'onion'], [/חריף|צ׳ילי|סחוג|חריסה/, 'spicy'], [/יין|בירה|וודקה|ערק|קוקטייל/, 'alcohol'],
+  [/ביצ|חביתה|שקשוקה/, 'eggs'], [/ירק|סלט|עגבני|מלפפון|ברוקולי|גזר|חציל|קישוא/, 'veg'], [/פרי|פירות|תפוח(?! אדמה)|בננה|תות|ענב/, 'fruit']
+];
+function guessFoodCats(name) {
+  const n = name.trim();
+  const set = new Set(FOOD_DICT[n] || []);
+  let hit = n in FOOD_DICT;
+  Object.keys(FOOD_DICT).forEach(k => { if (k.length >= 3 && k !== n && n.includes(k)) { FOOD_DICT[k].forEach(c => set.add(c)); hit = true; } });
+  FOOD_HINTS.forEach(([re, c]) => { if (re.test(n)) { set.add(c); hit = true; } });
+  return { cats: [...set], guessed: hit && set.size > 0 };
+}
+
+/* =====================================================================
+   Charts
+   ===================================================================== */
+S.range = 30;
+function lineChart(pts, yMin, yMax, color, ticks, unit) {
+  const W = 340, H = 150, l = 26, r = 8, t = 10, b = 22;
+  const n = pts.length, x = i => l + (n === 1 ? 0 : i * (W - l - r) / (n - 1)), y = v => t + (1 - (v - yMin) / (yMax - yMin)) * (H - t - b);
+  let path = '', pen = false;
+  pts.forEach((p, i) => { if (p.v == null) { pen = false; return; } path += (pen ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1); pen = true; });
+  const grid = ticks.map(v => `<line x1="${l}" x2="${W - r}" y1="${y(v)}" y2="${y(v)}" stroke="#E8DFD1" stroke-width="1"/><text x="${l - 6}" y="${y(v) + 4}" font-size="10" fill="#6E6475" text-anchor="end">${v}</text>`).join('');
+  const lab = [0, Math.floor((n - 1) / 2), n - 1].map(i => `<text x="${x(i)}" y="${H - 6}" font-size="10" fill="#6E6475" text-anchor="${i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}">${fmtShort(pts[i].s)}</text>`).join('');
+  const dots = pts.map((p, i) => p.v == null ? '' : `<circle cx="${x(i)}" cy="${y(p.v)}" r="3" fill="${color}" stroke="#fff" stroke-width="1.5"/>
+    <circle cx="${x(i)}" cy="${y(p.v)}" r="11" fill="transparent" data-tip="${fmtShort(p.s)} · ${fmt1(p.v)}${unit}"/>`).join('');
+  return `<div class="chart" style="position:relative" dir="ltr"><svg viewBox="0 0 ${W} ${H}" role="img">${grid}${lab}<path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${dots}</svg></div>`;
+}
+function barChart(vals, yMax, color, ticks, labelFn, tipFn) {
+  const W = 340, H = 150, l = 26, r = 8, t = 10, b = 22;
+  const n = vals.length, bw = (W - l - r) / n, y = v => t + (1 - v / yMax) * (H - t - b);
+  const grid = ticks.map(v => `<line x1="${l}" x2="${W - r}" y1="${y(v)}" y2="${y(v)}" stroke="#E8DFD1"/><text x="${l - 6}" y="${y(v) + 4}" font-size="10" fill="#6E6475" text-anchor="end">${v}</text>`).join('');
+  const bars = vals.map((v, i) => {
+    const bx = l + i * bw + 1, w = Math.max(1, bw - 2);
+    const lbl = labelFn(i) ? `<text x="${bx + w / 2}" y="${H - 6}" font-size="10" fill="#6E6475" text-anchor="middle">${labelFn(i)}</text>` : '';
+    if (v == null) return lbl;
+    const top = y(v), h = Math.max(0, y(0) - top);
+    return `<path d="M${bx} ${y(0)} V${top + Math.min(4, h)} Q${bx} ${top} ${bx + Math.min(4, w / 2)} ${top} H${bx + w - Math.min(4, w / 2)} Q${bx + w} ${top} ${bx + w} ${top + Math.min(4, h)} V${y(0)} Z" fill="${color}"/>
+      <rect x="${bx}" y="${t}" width="${w}" height="${H - t - b}" fill="transparent" data-tip="${tipFn(i, v)}"/>${lbl}`;
+  }).join('');
+  return `<div class="chart" style="position:relative" dir="ltr"><svg viewBox="0 0 ${W} ${H}" role="img">${grid}<line x1="${l}" x2="${W - r}" y1="${y(0)}" y2="${y(0)}" stroke="#C9BBA6"/>${bars}</svg></div>`;
+}
+function renderCharts() {
+  const t = todayS(), N = S.range;
+  const days = []; for (let i = N - 1; i >= 0; i--) days.push(addDays(t, -i));
+  const moodPts = days.map(s => ({ s, v: metrics(s).mood }));
+  const painPts = days.map(s => ({ s, v: metrics(s).pain }));
+  const any = moodPts.some(p => p.v != null) || painPts.some(p => p.v != null);
+  // emotion family counts
+  const famCnt = {}; days.forEach(s => { const fw = metrics(s).famW; Object.keys(fw).forEach(k => famCnt[k] = (famCnt[k] || 0) + 1); });
+  const famMax = Math.max(1, ...Object.values(famCnt));
+  // by cycle day (all history)
+  const ci = cycleInfo();
+  let cyc = '';
+  if (ci.n >= 1) {
+    const byCd = Array.from({ length: ci.len }, () => []), moodCd = Array.from({ length: ci.len }, () => []);
+    Object.keys(DATA.days).forEach(s => { if (s > t) return; const c = cycleOf(s); const m = metrics(s); if (!c || c.cd > ci.len) return; if (m.pain != null) byCd[c.cd - 1].push(m.pain); else if (m.hasEntries) byCd[c.cd - 1].push(0); if (m.mood != null) moodCd[c.cd - 1].push(m.mood); });
+    const pv = byCd.map(a => a.length ? avg(a) : null), mv = moodCd.map(a => a.length ? avg(a) : null);
+    cyc = `<section class="card"><h2>כאב לפי יום במחזור</h2><div class="xs muted" style="margin-bottom:8px">ממוצע הכאב המקסימלי היומי, מכל המחזורים שתועדו (${ci.n})</div>
+      ${barChart(pv, 10, '#7E4C91', [0, 5, 10], i => (i === 0 || (i + 1) % 7 === 0) ? i + 1 : '', (i, v) => 'יום ' + (i + 1) + ' · ' + fmt1(v) + ' (' + byCd[i].length + ' ימים)')}
+      </section>
+      <section class="card"><h2>מצב רוח לפי יום במחזור</h2><div class="xs muted" style="margin-bottom:8px">ממוצע הציון הכללי, 1–5</div>
+      ${barChart(mv, 5, '#3F6FA8', [0, 1, 3, 5], i => (i === 0 || (i + 1) % 7 === 0) ? i + 1 : '', (i, v) => 'יום ' + (i + 1) + ' · ' + fmt1(v) + ' (' + moodCd[i].length + ' ימים)')}
+      </section>`;
+  }
+  $view.innerHTML = `
+    <div class="between" style="padding-top:18px"><h1>גרפים</h1>
+      <div class="seg">${[30, 90].map(n => `<button aria-pressed="${S.range === n}" data-act="range" data-a="${n}">${n} יום</button>`).join('')}</div></div>
+    ${!any ? '<div class="card small muted">עוד אין מספיק נתונים. אחרי כמה ימים של הזנה הגרפים יתמלאו.</div>' : `
+    <section class="card"><h2>מצב רוח</h2><div class="xs muted" style="margin-bottom:8px">ממוצע יומי, 1–5 · הקישי על נקודה לפרטים</div>${lineChart(moodPts, 1, 5, '#3F6FA8', [1, 3, 5], '/5')}</section>
+    <section class="card"><h2>כאב</h2><div class="xs muted" style="margin-bottom:8px">הכאב החזק ביותר בכל יום, 0–10</div>${lineChart(painPts, 0, 10, '#7E4C91', [0, 5, 10], '/10')}</section>`}
+    ${Object.keys(famCnt).length ? `<section class="card"><h2>משפחות רגשיות</h2><div class="xs muted" style="margin-bottom:8px">בכמה ימים הופיעה כל משפחה ב-${N} הימים האחרונים</div>
+      ${FAM_LEGEND.map(id => { const f = famById(id), c = famCnt[id] || 0; return `<div class="row" style="margin:6px 0"><span class="small" style="width:104px;flex:0 0 auto">${f.name}</span><div style="flex:1;height:14px;background:#F1ECE3;border-radius:4px;overflow:hidden"><div style="height:14px;width:${c / famMax * 100}%;background:${f.c};border-radius:4px"></div></div><b class="small" style="width:24px;text-align:left">${c}</b></div>`; }).join('')}</section>` : ''}
+    ${cyc}`;
+}
+document.addEventListener('click', e => {
+  const tip = document.querySelector('.tip'); if (tip) tip.remove();
+  const el = e.target.closest('[data-tip]'); if (!el) return;
+  const box = el.closest('.chart'); const rb = box.getBoundingClientRect(), re = el.getBoundingClientRect();
+  const d = document.createElement('div'); d.className = 'tip'; d.textContent = el.getAttribute('data-tip');
+  d.style.left = (re.left + re.width / 2 - rb.left) + 'px'; d.style.top = (re.top - rb.top + (el.tagName === 'rect' ? 30 : 6)) + 'px';
+  box.appendChild(d);
+});
+
+/* =====================================================================
+   Insights (local, correlation only)
+   ===================================================================== */
+function renderInsights() {
+  const t = todayS();
+  const all = []; for (let i = 0; i < 180; i++) all.push(addDays(t, -i));
+  const logged = all.filter(s => metrics(s).hasEntries);
+  const need = 14;
+  let html = `<div style="padding-top:18px"><h1>תובנות</h1><div class="small muted" style="margin-top:4px">דפוסים שחוזרים בנתונים שלך. אלה מתאמים, לא הוכחה לסיבה.</div></div>`;
+  if (logged.length < need) {
+    html += `<div class="card"><div style="font-weight:700">אוספים נתונים</div><div class="small muted" style="margin:4px 0 10px">התובנות יופיעו אחרי ${need} ימים עם רשומות. כרגע: ${logged.length}.</div><div class="bar"><div style="width:${logged.length / need * 100}%;background:var(--accent)"></div></div></div>`;
+  }
+  // --- cycle phases
+  const ci = cycleInfo();
+  if (ci.n >= 1) {
+    const ph = { men: [], fol: [], ov: [], lut: [] };
+    logged.forEach(s => { const c = cycleOf(s); if (c) ph[c.phase].push(metrics(s)); });
+    const row = (k, f) => { const v = ph[k].map(f).filter(x => x != null); return v.length ? fmt1(avg(v)) : '—'; };
+    html += `<section class="card"><h2>לפי שלב במחזור</h2><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:14px">
+      <thead><tr style="color:var(--muted);font-size:12px"><th style="text-align:right;padding:6px 4px">שלב</th><th>ימים</th><th>כאב</th><th>מצב רוח</th><th>בטן</th></tr></thead><tbody>
+      ${Object.keys(ph).map(k => `<tr style="border-top:1px solid var(--line2)"><td style="padding:8px 4px"><span class="row" style="gap:6px"><span class="sw" style="background:${PHASES[k][1]}"></span>${PHASES[k][0]}</span></td><td style="text-align:center">${ph[k].length}</td>
+        <td style="text-align:center">${row(k, m => m.pain != null ? m.pain : 0)}</td><td style="text-align:center">${row(k, m => m.mood)}</td><td style="text-align:center">${row(k, m => m.belly || 0)}</td></tr>`).join('')}
+      </tbody></table></div><div class="xs muted" style="margin-top:6px">כאב 0–10 (מקסימום יומי), מצב רוח 1–5, בטן 0–4. מבוסס על ${ci.n} מחזורים שתועדו.</div></section>`;
+  }
+  // --- food ↔ outcomes
+  const foodFindings = foodInsights(all);
+  if (logged.length >= need) {
+    html += `<section class="card"><h2>אוכל ותסמינים</h2>
+      ${foodFindings.length ? foodFindings.map(f => `<div class="insight"><div style="font-weight:700">${esc(f.title)}</div><div class="small" style="color:var(--ink2);margin-top:2px">${esc(f.text)}</div><div class="xs muted" style="margin-top:2px">${esc(f.n)}</div></div>`).join('')
+        : '<div class="small muted">עוד לא נמצאו דפוסים חזקים מספיק. ככל שיצטברו ימים עם אוכל ורשומות, הם יופיעו כאן.</div>'}
+      <div class="xs muted" style="margin-top:10px">נבדקים הרבה צירופים של מזון ותסמין, ולכן חלק מהדפוסים יכולים לצוץ במקרה. מוצגים רק הבדלים גדולים שמבוססים על לפחות 4 ימים בכל צד.</div></section>`;
+  }
+  // --- supplements adherence
+  const last14 = all.slice(0, 14).filter(s => DATA.days[s]);
+  if (last14.length) {
+    html += `<section class="card"><h2>עמידה ביעדי תוספים</h2><div class="xs muted" style="margin-bottom:6px">14 הימים האחרונים שבהם פתחת את היומן</div>
+      ${DATA.supps.filter(sp => sp.active).map(sp => { let due = 0, done = 0; last14.forEach(s => { if (!suppDue(sp, s)) return; sp.times.forEach(tm => { due++; if (getDay(s).supp[sp.id + '|' + tm]) done++; }); }); const p = due ? Math.round(done / due * 100) : 0;
+        return `<div class="row" style="margin:8px 0"><span class="small" style="width:110px;flex:0 0 auto">${esc(sp.name)}</span><div class="bar" style="flex:1"><div style="width:${p}%"></div></div><b class="small" style="width:40px;text-align:left">${due ? p + '%' : '—'}</b></div>`; }).join('')}</section>`;
+  }
+  html += `<section class="card" style="background:var(--accent-soft);border-color:#D9CCE4"><h2>ניתוח עומק</h2><div class="small" style="color:var(--ink2)">לדפוסים מורכבים יותר (שילובים, השפעות מושהות, הערות חופשיות): ייצאי את הנתונים מההגדרות והעלי את הקובץ לשיחה עם Claude.</div>
+    <button class="btn block" style="margin-top:10px" data-act="export">ייצוא נתונים לניתוח</button></section>`;
+  $view.innerHTML = html;
+}
+function foodInsights(days) {
+  const outcomes = [
+    ['belly', 'תסמיני בטן', s => { const m = metrics(s); return m.hasEntries ? (m.belly || 0) : null; }, 'עוצמה ממוצעת', 4],
+    ['pain', 'כאב', s => { const m = metrics(s); return m.hasEntries ? (m.pain || 0) : null; }, 'כאב מקסימלי ממוצע', 10],
+    ['mood', 'מצב רוח', s => metrics(s).mood, 'ציון ממוצע', 5],
+    ['lowsad', 'ימי עצב או דכדוך', s => { const m = metrics(s); return m.moodSeq.length ? ((m.famW.low || m.famW.sad) ? 1 : 0) : null; }, 'שיעור הימים', 1],
+    ['stool', 'יציאות לא תקינות', s => { const m = metrics(s); return m.hasEntries ? (m.stool.some(b => b <= 2 || b >= 6) ? 1 : 0) : null; }, 'שיעור הימים', 1]
+  ];
+  const groups = FOOD_CATS.map(c => [c[0], c[1], s => metrics(s).cats.has(c[0])])
+    .concat([['bought', 'אוכל קנוי', s => getDay(s).foods.some(f => f.prep === 'קנוי')], ['out', 'אוכל בחוץ', s => getDay(s).foods.some(f => f.prep === 'בחוץ / מסעדה')]]);
+  const foodDays = days.filter(s => metrics(s).foodsLogged);
+  const res = [];
+  groups.forEach(([gid, gname, has]) => {
+    [0, 1].forEach(lag => outcomes.forEach(([oid, oname, val, unit, scale]) => {
+      const w = [], wo = [];
+      foodDays.forEach(s => { const v = val(addDays(s, lag)); if (v == null) return; (has(s) ? w : wo).push(v); });
+      if (w.length < 4 || wo.length < 4) return;
+      const mw = avg(w), mo = avg(wo);
+      const sd = Math.sqrt((w.reduce((a, x) => a + (x - mw) ** 2, 0) + wo.reduce((a, x) => a + (x - mo) ** 2, 0)) / Math.max(1, w.length + wo.length - 2));
+      const eff = (mw - mo) / Math.max(sd, scale * 0.08);
+      if (Math.abs(eff) < 0.6) return;
+      const pct = scale === 1;
+      const f = x => pct ? Math.round(x * 100) + '%' : fmt1(x);
+      const dir = oid === 'mood' ? (mw > mo ? 'גבוה יותר' : 'נמוך יותר') : (mw > mo ? 'יותר' : 'פחות');
+      res.push({
+        score: Math.abs(eff) * Math.min(1, Math.sqrt(Math.min(w.length, wo.length) / 8)),
+        title: `${gname} ← ${oname} ${dir} ${lag ? '(יום אחרי)' : ''}`.trim(),
+        text: `${gname === 'אוכל קנוי' || gname === 'אוכל בחוץ' ? 'בימים עם ' + gname : 'בימים שאכלת ' + gname}: ${unit} ${f(mw)}${lag ? ' ביום שאחרי' : ''}, לעומת ${f(mo)} אחרי שאר הימים`.replace(' אחרי שאר', lag ? ' אחרי שאר' : ' בשאר') + '.',
+        n: `${w.length} ימים מול ${wo.length}`
+      });
+    }));
+  });
+  return res.sort((a, b) => b.score - a.score).slice(0, 8);
+}
+
+/* =====================================================================
+   Settings
+   ===================================================================== */
+function renderSettings() {
+  let last = null; try { last = localStorage.getItem('tracker.lastBackup'); } catch (e) {}
+  const sup = DATA.supps.map(sp => {
+    const open = S.suppOpen === sp.id;
+    return `<div style="border:1px solid ${open ? '#B9A6C8' : 'var(--line)'};border-radius:14px;margin-top:8px;overflow:hidden;background:#fff">
+      <button type="button" class="between" style="width:100%;min-height:58px;padding:8px 14px;border:none;background:none;text-align:right" data-act="suppOpen" data-a="${sp.id}" aria-expanded="${open}">
+        <span><span style="display:block;font-weight:700;${sp.active ? '' : 'color:var(--muted)'}">${esc(sp.name)}${sp.active ? '' : ' (מושהה)'}</span><span class="small muted">${esc(freqText(sp) + ' · ' + (sp.times.join(', ') || 'לא נקבע זמן'))}</span></span>
+        <span style="color:var(--accent);transform:rotate(${open ? 180 : 0}deg)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>
+      </button>
+      ${open ? `<div style="padding:4px 14px 14px;border-top:1px solid var(--line2)">
+        <label class="lbl" style="display:block" for="sn-${sp.id}">שם</label><input id="sn-${sp.id}" class="input" value="${esc(sp.name)}" data-input="suppName" data-a="${sp.id}">
+        <label class="lbl" style="display:block" for="sd-${sp.id}">מינון</label><input id="sd-${sp.id}" class="input" value="${esc(sp.dose)}" placeholder="לדוגמה: 600 מ״ג" data-input="suppDose" data-a="${sp.id}">
+        <div class="lbl">מתי לוקחים?</div><div class="wrap">${SUPP_TIMES.map(x => chip(x, sp.times.includes(x), 'suppTime', sp.id + '::' + x)).join('')}</div>
+        <div class="lbl">תדירות</div><div class="wrap">${FREQS.map(f => chip(f[1], sp.freq === f[0], 'suppFreq', sp.id + '::' + f[0])).join('')}</div>
+        ${sp.freq === 'weekly' ? `<div class="lbl">כמה פעמים בשבוע?</div><div class="scale" style="grid-template-columns:repeat(6,minmax(0,1fr))">${[1, 2, 3, 4, 5, 6].map(n => `<button aria-pressed="${sp.n === n}" style="background:#fff;border:1px solid var(--chipline)" data-act="suppN" data-a="${sp.id}::${n}">${n}</button>`).join('')}</div>` : ''}
+        ${sp.freq === 'days' ? `<div class="lbl">באילו ימים?</div><div class="grid7">${DAY_LETTERS.map((l, i) => chip(l, (sp.days || []).includes(i), 'suppDay', sp.id + '::' + i)).join('')}</div>` : ''}
+        ${sp.freq === 'alt' ? `<div class="xs muted" style="margin-top:6px">מתחיל מהיום שבו נבחרה התדירות.</div>` : ''}
+        <div class="row" style="margin-top:14px"><button class="btn ghost" style="flex:1" data-act="suppActive" data-a="${sp.id}">${sp.active ? 'השהיה' : 'הפעלה מחדש'}</button><button class="btn ghost" style="color:#A3324A" data-act="suppDel" data-a="${sp.id}">מחיקה</button></div>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+  const lib = Object.keys(DATA.foodLib).sort((a, b) => a.localeCompare(b, 'he'));
+  $view.innerHTML = `
+    <div style="padding-top:18px"><h1>הגדרות</h1></div>
+    <section class="card"><h2>תוספים ויעדים</h2>${sup}<button class="btn soft block" style="margin-top:10px" data-act="suppAdd">+ הוספת תוסף</button></section>
+    <section class="card"><details ${S.libOpen ? 'open' : ''} data-act="libToggle"><summary class="between"><h2 style="margin:0">ספריית המאכלים שלי</h2><span class="small muted">${lib.length} פריטים</span></summary>
+      <div class="xs muted" style="margin:6px 0">הקבוצות של כל מאכל משמשות לזיהוי דפוסים. אפשר לתקן כאן בכל רגע.</div>
+      ${lib.map(n => `<div style="padding:10px 0;border-top:1px solid var(--line2)"><div class="between"><b>${esc(n)}</b><button class="iconbtn" style="width:36px;height:36px;color:var(--muted)" aria-label="מחיקת ${esc(n)} מהספרייה" data-act="libDel" data-a="${esc(n)}">${ICON.x}</button></div>
+        <div class="wrap" style="margin-top:6px">${FOOD_CATS.map(c => `<button type="button" class="chip" style="min-height:34px;font-size:13px;padding:0 10px" aria-pressed="${DATA.foodLib[n].cats.includes(c[0])}" data-act="libCat" data-a="${esc(n)}::${c[0]}">${c[1]}</button>`).join('')}</div></div>`).join('') || '<div class="small muted">עוד אין מאכלים. הם יתווספו כאן כשתזיני אוכל.</div>'}
+    </details></section>
+    <section class="card"><h2>מחזור</h2><label class="small muted" for="cycLen">אורך מחזור משוער (עד שיצטברו נתונים)</label>
+      <div class="row" style="margin-top:6px"><input id="cycLen" class="input" style="width:100px" type="number" min="18" max="50" value="${DATA.settings.cycleLen || 28}" data-input="cycLen"><span class="small muted">ימים · מחושב בפועל: ${cycleInfo().n >= 2 ? cycleInfo().len + ' ימים' : 'עוד אין מספיק מחזורים'}</span></div></section>
+    <section class="card"><h2>גיבוי וייצוא</h2>
+      <div class="small muted" style="margin-bottom:10px">${last ? 'גיבוי אחרון: ' + fmtShort(last) + '.' + last.slice(0, 4) : 'עוד לא גיבית. הנתונים נשמרים רק בטלפון הזה.'}</div>
+      <button class="btn block" data-act="export">ייצוא נתונים (גיבוי + ניתוח עם Claude)</button>
+      <label class="btn ghost block" style="display:flex;align-items:center;justify-content:center;margin-top:8px">שחזור מגיבוי<input type="file" accept="application/json,.json" style="display:none" data-change="import"></label>
+      <div class="xs muted" style="margin-top:8px">קובץ הייצוא כולל גם את יומן האימונים מ-Workout Pro, כדי שהניתוח יראה את התמונה המלאה. השחזור מחליף רק את נתוני היומן הזה.</div></section>
+    <div class="xs muted" style="text-align:center;margin-top:16px">יומן בריאות · כל הנתונים נשמרים על המכשיר בלבד</div>`;
+}
+
+/* =====================================================================
+   Actions & events
+   ===================================================================== */
+function render() {
+  document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-current', b.dataset.tab === S.tab && !S.day ? 'page' : 'false'));
+  if (S.day) renderDay();
+  else if (S.tab === 'cal') renderCal();
+  else if (S.tab === 'charts') renderCharts();
+  else if (S.tab === 'insights') renderInsights();
+  else renderSettings();
+}
+const split2 = a => { const i = a.indexOf('::'); return [a.slice(0, i), a.slice(i + 2)]; };
+const toggleIn = (arr, x) => { const i = arr.indexOf(x); if (i >= 0) arr.splice(i, 1); else arr.push(x); };
+function supp(id) { return DATA.supps.find(s => s.id === id); }
+
+function addFoodName(name) {
+  name = (name || '').trim().replace(/\s+/g, ' ');
+  if (!name) return;
+  const d = editDay(S.day);
+  d.foods.push({ name, slot: S.slot, prep: S.prep });
+  if (!DATA.foodLib[name]) {
+    const g = guessFoodCats(name);
+    DATA.foodLib[name] = { cats: g.cats, confirmed: false };
+    S.pending = { name, cats: g.cats.slice(), guessed: g.guessed };
+  }
+  save();
+}
+
+const ACT = {
+  tab: a => { closeSheet(); S.day = null; S.tab = a; if (history.state && history.state.v) history.replaceState(null, ''); render(); window.scrollTo(0, 0); },
+  goToday: () => { S.month = todayS().slice(0, 7); S.sel = todayS(); render(); },
+  month: a => { const [y, m] = S.month.split('-').map(Number); const d = new Date(y, m - 1 + Number(a), 1); S.month = d.getFullYear() + '-' + pad(d.getMonth() + 1); render(); },
+  layer: a => { S.layer = a; render(); },
+  moodMode: a => { S.moodMode = a; render(); },
+  selDay: a => { if (S.sel === a) return ACT.openDay(a); S.sel = a; render(); },
+  openDay: a => { S.day = a; S.sel = a; S.pending = null; history.pushState({ v: 'day' }, ''); render(); window.scrollTo(0, 0); },
+  back: () => { if (history.state && history.state.v === 'day') history.back(); else { S.day = null; render(); } },
+  dayNav: a => { S.day = addDays(S.day, Number(a)); S.sel = S.day; S.month = S.day.slice(0, 7); S.pending = null; render(); },
+  bleed: a => { editDay(S.day).bleed = a === 'אין' ? 'אין' : a; save(); render(); },
+  extra: a => { toggleIn(editDay(S.day).extras, a); save(); render(); },
+  sleepH: a => { const d = editDay(S.day); d.sleepH = d.sleepH === a ? '' : a; save(); render(); },
+  sleepQ: a => { const d = editDay(S.day); d.sleepQ = d.sleepQ === a ? '' : a; save(); render(); },
+  supp: a => { const d = editDay(S.day); d.supp[a] = !d.supp[a]; if (!d.supp[a]) delete d.supp[a]; save(); render(); },
+  slot: a => { S.slot = a; render(); },
+  prep: a => { S.prep = a; render(); },
+  addFood: () => { const el = document.getElementById('foodIn'); addFoodName(el && el.value); render(); const n = document.getElementById('foodIn'); if (n && !S.pending) n.focus(); },
+  quickFood: a => { addFoodName(a); render(); },
+  rmFood: a => { editDay(S.day).foods.splice(Number(a), 1); save(); render(); },
+  pcat: a => { toggleIn(S.pending.cats, a); render(); },
+  confirmFood: () => { DATA.foodLib[S.pending.name] = { cats: S.pending.cats.slice(), confirmed: true }; S.pending = null; save(); render(); toast('נשמר בספריית המאכלים'); },
+  skipFood: () => { S.pending = null; render(); },
+  crave: a => { toggleIn(editDay(S.day).craves, a); save(); render(); },
+  feel: a => { const d = editDay(S.day); d.feel = d.feel === Number(a) ? 0 : Number(a); save(); render(); },
+  newEntry: () => { S.comp = newComp('mood'); history.pushState({ v: 'sheet' }, ''); openSheet(); },
+  editEntry: a => { const e = getDay(S.day).entries.find(x => x.id === a); if (!e) return; S.comp = Object.assign(newComp(e.kind), JSON.parse(JSON.stringify(e))); history.pushState({ v: 'sheet' }, ''); openSheet(); },
+  cKind: a => { S.comp.kind = a; S.comp.syms = []; S.comp.when = []; S.comp.help = []; renderSheet(); },
+  cToggle: a => { const [f, v] = split2(a); toggleIn(S.comp[f], v); renderSheet(); },
+  cSet: a => { const [f, v] = split2(a); S.comp[f] = v; renderSheet(); },
+  cNum: a => { const [f, v] = split2(a); S.comp[f] = Number(v); renderSheet(); },
+  cSave: () => {
+    const c = S.comp;
+    if ((c.kind === 'belly' || c.kind === 'other') && !c.syms.length) { toast('בחרי לפחות תסמין אחד'); return; }
+    const d = editDay(S.day); const e = compToEntry(c);
+    const i = d.entries.findIndex(x => x.id === e.id);
+    if (i >= 0) d.entries[i] = e; else d.entries.push(e);
+    save(); ACT.cClose(); render();
+  },
+  cDelete: () => { if (!confirm('למחוק את הרשומה?')) return; const d = editDay(S.day); d.entries = d.entries.filter(x => x.id !== S.comp.id); save(); ACT.cClose(); render(); },
+  cClose: () => { if (history.state && history.state.v === 'sheet') history.back(); else closeSheet(); },
+  range: a => { S.range = Number(a); render(); },
+  export: () => {
+    let wl = []; try { wl = JSON.parse(localStorage.getItem(WORKOUT_KEY) || '[]'); } catch (e) {}
+    const out = { app: 'tracker', version: 1, exportedAt: new Date().toISOString(), data: DATA, workoutLog: wl,
+      legend: { scales: 'mood score 1-5, energy 1-5, pain 0-10, severity קלה<בינונית<חזקה<קשה, bristol 1-7', foodCats: Object.fromEntries(FOOD_CATS) } };
+    download('tracker-' + todayS() + '.json', JSON.stringify(out, null, 1));
+    try { localStorage.setItem('tracker.lastBackup', todayS()); } catch (e) {}
+    if (S.tab === 'settings' && !S.day) setTimeout(render, 300);
+  },
+  suppOpen: a => { S.suppOpen = S.suppOpen === a ? null : a; render(); },
+  suppTime: a => { const [id, v] = split2(a); toggleIn(supp(id).times, v); supp(id).times.sort((x, y) => SUPP_TIMES.indexOf(x) - SUPP_TIMES.indexOf(y)); save(); render(); },
+  suppFreq: a => { const [id, v] = split2(a); const sp = supp(id); sp.freq = v; if (v === 'alt') sp.anchor = todayS(); if (v === 'weekly' && !(sp.n < 7)) sp.n = 3; save(); render(); },
+  suppN: a => { const [id, v] = split2(a); supp(id).n = Number(v); save(); render(); },
+  suppDay: a => { const [id, v] = split2(a); const sp = supp(id); sp.days = sp.days || []; toggleIn(sp.days, Number(v)); save(); render(); },
+  suppActive: a => { supp(a).active = !supp(a).active; save(); render(); },
+  suppDel: a => { if (!confirm('למחוק את "' + supp(a).name + '"? הסימונים הקודמים יישארו בנתונים.')) return; DATA.supps = DATA.supps.filter(s => s.id !== a); S.suppOpen = null; save(); render(); },
+  suppAdd: () => { const id = uid(); DATA.supps.push({ id, name: 'תוסף חדש', dose: '', times: ['בוקר'], freq: 'daily', n: 7, days: [], anchor: todayS(), active: true }); S.suppOpen = id; save(); render(); setTimeout(() => { const el = document.getElementById('sn-' + id); if (el) { el.focus(); el.select(); } }, 50); },
+  libToggle: () => {},
+  libCat: a => { const [n, c] = split2(a); toggleIn(DATA.foodLib[n].cats, c); DATA.foodLib[n].confirmed = true; save(); S.libOpen = true; render(); },
+  libDel: a => { if (!confirm('למחוק את "' + a + '" מהספרייה? בפעם הבאה שתזיני אותו תתבקשי לסמן קבוצות מחדש.')) return; delete DATA.foodLib[a]; save(); S.libOpen = true; render(); }
+};
+document.addEventListener('click', e => {
+  const tab = e.target.closest('#tabs button');
+  if (tab) { ACT.tab(tab.dataset.tab); return; }
+  const el = e.target.closest('[data-act]');
+  if (!el || el.tagName === 'DETAILS') return;
+  const fn = ACT[el.dataset.act];
+  if (fn) { e.preventDefault(); fn(el.dataset.a); }
+});
+document.addEventListener('toggle', e => { if (e.target.matches && e.target.matches('details[data-act="libToggle"]')) S.libOpen = e.target.open; }, true);
+$sheet.addEventListener('click', e => { if (e.target === $sheet) ACT.cClose(); });
+let noteTimer = null;
+document.addEventListener('input', e => {
+  const el = e.target, k = el.dataset && el.dataset.input; if (!k) return;
+  if (k === 'cTime') S.comp.t = el.value;
+  else if (k === 'cNote') S.comp.note = el.value;
+  else if (k === 'cTemp') S.comp.temp = el.value;
+  else if (k === 'dayNote') { clearTimeout(noteTimer); const s = S.day; noteTimer = setTimeout(() => { editDay(s).note = el.value; save(); }, 400); }
+  else if (k === 'suppName') { supp(el.dataset.a).name = el.value; save(); }
+  else if (k === 'suppDose') { supp(el.dataset.a).dose = el.value; save(); }
+  else if (k === 'cycLen') { const v = Number(el.value); if (v >= 18 && v <= 50) { DATA.settings.cycleLen = v; save(); } }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.dataset && e.target.dataset.enter) { e.preventDefault(); ACT[e.target.dataset.enter](); }
+});
+document.addEventListener('change', e => {
+  if (e.target.dataset && e.target.dataset.change === 'import') {
+    const file = e.target.files && e.target.files[0]; if (!file) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const obj = JSON.parse(r.result);
+        if (!obj || obj.app !== 'tracker' || !obj.data || !obj.data.days) throw new Error('bad');
+        if (!confirm('לשחזר מהגיבוי? הנתונים הנוכחיים ביומן יוחלפו בנתוני הגיבוי. (יומן האימונים לא ישתנה.)')) return;
+        localStorage.setItem(KEY, JSON.stringify(obj.data)); load(); invalidate(); render(); toast('השחזור הצליח');
+      } catch (err) { alert('הקובץ לא נראה כמו גיבוי של היומן'); }
+      e.target.value = '';
+    };
+    r.readAsText(file);
+  }
+});
+window.addEventListener('popstate', () => {
+  if ($sheet.classList.contains('open')) { closeSheet(); return; }
+  if (S.day) { flushNote(); S.day = null; S.pending = null; render(); }
+});
+function flushNote() { const el = document.getElementById('dayNote'); if (el && S.day && el.value !== getDay(S.day).note) { clearTimeout(noteTimer); editDay(S.day).note = el.value; save(); } }
+window.addEventListener('pagehide', flushNote);
+// another app (Workout Pro) may have written new workouts — refresh when we come back
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { invalidate(); if (!$sheet.classList.contains('open') && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) render(); } });
+
+/* ---------------- init ---------------- */
+load();
+render();
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('tracker-sw.js').catch(() => {});
+</script>
+</body>
+</html>
