@@ -169,8 +169,8 @@ const SLOTS = ['כל היום', 'בוקר', 'צהריים', 'ערב', 'ביני�
 const PREP = ['ביתי', 'קנוי', 'בחוץ / מסעדה'];
 const CRAVES = ['מתוק', 'מלוח', 'שוקולד', 'פחמימות', 'רק אוכל יבש', 'רתיעה מאוכל', 'רתיעה מריחות של אוכל'];
 const FOOD_CATS = [
-  ['gluten', 'גלוטן / לחם'], ['dairy', 'מוצרי חלב'], ['eggs', 'ביצים'], ['sugar', 'סוכר ומתוקים'],
-  ['caffeine', 'קפאין'], ['fried', 'מטוגן / שומני'], ['legumes', 'קטניות'], ['onion', 'בצל ושום'],
+  ['gluten', 'גלוטן / לחם'], ['carbs', 'פחמימות'], ['dairy', 'מוצרי חלב'], ['eggs', 'ביצים'], ['sugar', 'סוכר ומתוקים'],
+  ['caffeine', 'קפאין'], ['fried', 'מטוגן / שומני'], ['legumes', 'קטניות'], ['soy', 'סויה'], ['onion', 'בצל ושום'],
   ['spicy', 'חריף'], ['alcohol', 'אלכוהול'], ['salty', 'חטיפים מלוחים'], ['veg', 'ירקות'],
   ['fruit', 'פירות'], ['processed', 'מזון מעובד']
 ];
@@ -219,6 +219,10 @@ function load() {
   try { DATA = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { DATA = null; }
   if (!DATA || !DATA.days) DATA = freshData();
   DATA.foodLib = DATA.foodLib || {};
+  let migrated = false;
+  // foods saved before the dictionary knew them: try again (only if never confirmed and still empty)
+  if (typeof guessFoodCats === 'function') Object.keys(DATA.foodLib).forEach(n => { const f = DATA.foodLib[n]; if (!f.confirmed && !(f.cats || []).length) { const g = guessFoodCats(n).cats; if (g.length) { f.cats = g; migrated = true; } } });
+  if (migrated) try { localStorage.setItem(KEY, JSON.stringify(DATA)); } catch (e) {}
   DATA.supps = DATA.supps || defaultSupps();
   DATA.settings = DATA.settings || { cycleLen: 28 };
 }
@@ -291,6 +295,8 @@ function cycleOf(s) {
 const PHASES = { men: ['וסת', '#B85C7E'], fol: ['זקיקי', '#F3E7EA'], ov: ['ביוץ (משוער)', '#DCA7BA'], lut: ['לוטאלי', '#E6DDEE'] };
 
 /* ---------- supplements ---------- */
+// a supplement with no set time still gets one "לקחתי" button
+function suppSlots(sp) { return sp.times && sp.times.length ? sp.times : ['לקחתי']; }
 function suppDue(sp, s) {
   if (!sp.active) return false;
   if (sp.freq === 'daily') return true;
@@ -298,8 +304,8 @@ function suppDue(sp, s) {
   if (sp.freq === 'days') return (sp.days || []).includes(parseD(s).getDay());
   if (sp.freq === 'weekly') {
     let cnt = 0; const ws = weekStart(s);
-    for (let x = ws; x < s; x = addDays(x, 1)) if (sp.times.some(tm => getDay(x).supp[sp.id + '|' + tm])) cnt++;
-    const takenToday = sp.times.some(tm => getDay(s).supp[sp.id + '|' + tm]);
+    for (let x = ws; x < s; x = addDays(x, 1)) if (suppSlots(sp).some(tm => getDay(x).supp[sp.id + '|' + tm])) cnt++;
+    const takenToday = suppSlots(sp).some(tm => getDay(s).supp[sp.id + '|' + tm]);
     return cnt < (sp.n || 1) || takenToday;
   }
   return true;
@@ -313,7 +319,7 @@ function suppDayStats(s) {
   let due = 0, done = 0;
   DATA.supps.forEach(sp => {
     if (!suppDue(sp, s)) return;
-    sp.times.forEach(tm => { due++; if (getDay(s).supp[sp.id + '|' + tm]) done++; });
+    suppSlots(sp).forEach(tm => { due++; if (getDay(s).supp[sp.id + '|' + tm]) done++; });
   });
   return { due, done, pct: due ? Math.round(done / due * 100) : null };
 }
@@ -602,7 +608,7 @@ function suppCard(s) {
   const d = getDay(s); const st = suppDayStats(s);
   const rows = DATA.supps.filter(sp => sp.active).map(sp => {
     const due = suppDue(sp, s);
-    const btns = sp.times.map(tm => {
+    const btns = suppSlots(sp).map(tm => {
       const on = !!d.supp[sp.id + '|' + tm];
       return `<button type="button" class="chip" style="min-height:40px;${on ? 'background:var(--gold);border-color:var(--gold);color:#fff' : ''}" aria-pressed="${on}" data-act="supp" data-a="${esc(sp.id + '|' + tm)}" aria-label="${esc(sp.name)}, ${tm}">${on ? ICON.check + ' ' : ''}${tm}</button>`;
     }).join('');
@@ -746,6 +752,7 @@ const FOOD_DICT = (() => {
     SP = 'spicy', AL = 'alcohol', SA = 'salty', V = 'veg', FR = 'fruit', P = 'processed';
   const d = {};
   const add = (cats, names) => names.split('|').forEach(n => d[n] = cats);
+  const also = (cat, names) => names.split('|').forEach(n => { d[n] = (d[n] || []).filter(c => c !== cat).concat([cat]); });
   // breads & baked
   add([G], 'לחם|לחם מחמצת|לחם מלא|לחם לבן|פיתה|לאפה|בגט|חלה|טוסט|פרוסה|קרקרים|לחמניה|לחמנייה|בייגל|קרואסון|מצה|פריכיות|טורטייה|טורטיה|פתיתים|קוסקוס|בורגול|פסטה|ספגטי|ניוקי|אטריות|נודלס|לזניה|פנקייק|וופל|פיצה|בצק|כופתאות|רביולי|פוקאצ׳ה|פוקצ׳ה');
   add([G, D], 'טוסט גבינה|פסטה ברוטב שמנת|לזניה|פיצה|מאפה גבינה|בורקס גבינה|גבינה ולחם');
@@ -808,22 +815,35 @@ const FOOD_DICT = (() => {
   add([SU, G], 'גרנולה');
   add([LE], 'חמאת בוטנים');
   add([G, E, F, V, LE], 'סביח');
+  // carbohydrates / starches (on top of any other group)
+  const CB = 'carbs';
+  add([CB], 'אורז|אורז לבן|אורז מלא|אורז בסמטי|אורז יסמין|אורז פרסי|סושי|נודלס אורז|אטריות אורז|קינואה|כוסמת|תפוח אדמה|תפוחי אדמה|פירה|בטטה|תירס|פולנטה|פריכיות אורז|דוחן|גריסים|כוסמין|קסאווה|ניוקי תפוחי אדמה|תפוחי אדמה אפויים');
+  also(CB, 'לחם|לחם מחמצת|לחם מלא|לחם לבן|פיתה|לאפה|בגט|חלה|טוסט|לחמניה|לחמנייה|בייגל|מצה|טורטייה|טורטיה|פתיתים|קוסקוס|בורגול|פסטה|ספגטי|ניוקי|אטריות|נודלס|לזניה|פיצה|כופתאות|רביולי|שיבולת שועל|דייסת שיבולת שועל|גרנולה|דגני בוקר|פנקייק|וופל|קרקרים|פריכיות|צ׳יפס|טוגנים|לביבות|מג׳דרה|טוסט גבינה|פסטה ברוטב עגבניות|ספגטי ברוטב|פסטה ברוטב|פסטה ברוטב שמנת|בורקס|ג׳חנון|מלאווח|סביח|פלאפל בפיתה|תפוצ׳יפס|בייגלה');
+  // soy: always legumes + soy
+  ['טופו','טופו מוקפץ','טופו אפוי','טופו משי','טמפה','אדממה','סויה','חלב סויה','משקה סויה','יוגורט סויה','מיסו','מרק מיסו','שניצל סויה','נקניקיות סויה','פולי סויה','קציצות סויה','בשר סויה','חלבון סויה'].forEach(n => { d[n] = [...new Set((d[n] || []).concat(['legumes', 'soy']))]; });
+  d['רוטב סויה'] = ['soy'];
+  ['חלב שקדים','חלב שיבולת שועל','חלב אורז','חלב קוקוס','משקה שקדים','משקה שיבולת שועל','חלב צמחי'].forEach(n => d[n] = []);
   return d;
 })();
 // extra hints by word fragments inside a free-text name
 const FOOD_HINTS = [
-  [/גבינ|שמנת|יוגורט|חלב(?!ה)|חמאה|פטה|מוצרלה|פרמז|קוטג|לבנ/, 'dairy'], [/לחם|פיתה|פסטה|בצק|קמח|טוסט|לחמני|מאפ|עוג|קרקר|בורקס/, 'gluten'],
+  [/אורז|פסטה|לחם|פיתה|תפוח(?:י)? אדמה|בטטה|קינואה|כוסמת|פתיתים|קוסקוס|ניוקי|אטריות|נודלס|פירה|תירס|שיבולת שועל|דייסה/, 'carbs'],
+  [/גבינ|שמנת|יוגורט|חלב(?!ה| סויה| שקדים| שיבולת| אורז| קוקוס| צמחי| אגוזים)|חמאה|פטה|מוצרלה|פרמז|קוטג|לבנ/, 'dairy'], [/לחם|פיתה|פסטה|בצק|קמח|טוסט|לחמני|מאפ|עוג|קרקר|בורקס/, 'gluten'],
   [/שוקולד|מתוק|סוכר|ממתק|ריבה|דבש|עוגי|עוג/, 'sugar'], [/קפה|אספרסו|לאטה|הפוך|תה (?!צמח)|קולה/, 'caffeine'],
-  [/מטוגן|טוגנ|צ׳יפס|שניצל|פלאפל/, 'fried'], [/חומוס|עדש|שעועית|אפונה|טופו|סויה/, 'legumes'],
+  [/מטוגן|טוגנ|צ׳יפס|שניצל|פלאפל/, 'fried'], [/חומוס|עדש|שעועית|אפונה|טופו|סויה|טמפה|אדממה/, 'legumes'], [/טופו|סויה|טמפה|אדממה|מיסו/, 'soy'],
   [/בצל|שום|כרשה/, 'onion'], [/חריף|צ׳ילי|סחוג|חריסה/, 'spicy'], [/יין|בירה|וודקה|ערק|קוקטייל/, 'alcohol'],
-  [/ביצ|חביתה|שקשוקה/, 'eggs'], [/ירק|סלט|עגבני|מלפפון|ברוקולי|גזר|חציל|קישוא/, 'veg'], [/פרי|פירות|תפוח(?! אדמה)|בננה|תות|ענב/, 'fruit']
+  [/ביצ|חביתה|שקשוקה/, 'eggs'], [/ירק|סלט|עגבני|מלפפון|ברוקולי|גזר|חציל|קישוא/, 'veg'], [/פרי|פירות|תפוח(?!י? אדמה)|בננה|תות|ענב/, 'fruit']
 ];
 function guessFoodCats(name) {
   const n = name.trim();
   const set = new Set(FOOD_DICT[n] || []);
   let hit = n in FOOD_DICT;
-  Object.keys(FOOD_DICT).forEach(k => { if (k.length >= 3 && k !== n && n.includes(k)) { FOOD_DICT[k].forEach(c => set.add(c)); hit = true; } });
+  // words found inside the name; ignore a word that is only part of a longer match (תפוח inside תפוחי אדמה)
+  const found = Object.keys(FOOD_DICT).filter(k => k.length >= 3 && n.includes(k));
+  found.filter(k => k !== n && !found.some(o => o !== k && o.includes(k))).forEach(k => { FOOD_DICT[k].forEach(c => set.add(c)); hit = true; });
   FOOD_HINTS.forEach(([re, c]) => { if (re.test(n)) { set.add(c); hit = true; } });
+  // plant milk is not dairy (unless the name also has cheese, yogurt etc.)
+  if (/חלב (סויה|שקדים|שיבולת|אורז|קוקוס|צמחי|אגוזים)/.test(n) && !/גבינ|יוגורט|שמנת|חמאה|פטה|מוצרלה|קוטג|לבנ/.test(n)) set.delete('dairy');
   return { cats: [...set], guessed: hit && set.size > 0 };
 }
 
@@ -934,7 +954,7 @@ function renderInsights() {
   const last14 = all.slice(0, 14).filter(s => DATA.days[s]);
   if (last14.length) {
     html += `<section class="card"><h2>עמידה ביעדי תוספים</h2><div class="xs muted" style="margin-bottom:6px">14 הימים האחרונים שבהם פתחת את היומן</div>
-      ${DATA.supps.filter(sp => sp.active).map(sp => { let due = 0, done = 0; last14.forEach(s => { if (!suppDue(sp, s)) return; sp.times.forEach(tm => { due++; if (getDay(s).supp[sp.id + '|' + tm]) done++; }); }); const p = due ? Math.round(done / due * 100) : 0;
+      ${DATA.supps.filter(sp => sp.active).map(sp => { let due = 0, done = 0; last14.forEach(s => { if (!suppDue(sp, s)) return; suppSlots(sp).forEach(tm => { due++; if (getDay(s).supp[sp.id + '|' + tm]) done++; }); }); const p = due ? Math.round(done / due * 100) : 0;
         return `<div class="row" style="margin:8px 0"><span class="small" style="width:110px;flex:0 0 auto">${esc(sp.name)}</span><div class="bar" style="flex:1"><div style="width:${p}%"></div></div><b class="small" style="width:40px;text-align:left">${due ? p + '%' : '—'}</b></div>`; }).join('')}</section>`;
   }
   html += `<section class="card" style="background:var(--accent-soft);border-color:#D9CCE4"><h2>ניתוח עומק</h2><div class="small" style="color:var(--ink2)">לדפוסים מורכבים יותר (שילובים, השפעות מושהות, הערות חופשיות): ייצאי את הנתונים מההגדרות והעלי את הקובץ לשיחה עם Claude.</div>
@@ -985,7 +1005,7 @@ function renderSettings() {
     const open = S.suppOpen === sp.id;
     return `<div style="border:1px solid ${open ? '#B9A6C8' : 'var(--line)'};border-radius:14px;margin-top:8px;overflow:hidden;background:#fff">
       <button type="button" class="between" style="width:100%;min-height:58px;padding:8px 14px;border:none;background:none;text-align:right" data-act="suppOpen" data-a="${sp.id}" aria-expanded="${open}">
-        <span><span style="display:block;font-weight:700;${sp.active ? '' : 'color:var(--muted)'}">${esc(sp.name)}${sp.active ? '' : ' (מושהה)'}</span><span class="small muted">${esc(freqText(sp) + ' · ' + (sp.times.join(', ') || 'לא נקבע זמן'))}</span></span>
+        <span><span style="display:block;font-weight:700;${sp.active ? '' : 'color:var(--muted)'}">${esc(sp.name)}${sp.active ? '' : ' (מושהה)'}</span><span class="small muted">${esc(freqText(sp) + ' · ' + (sp.times.join(', ') || 'בלי שעה קבועה'))}</span></span>
         <span style="color:var(--accent);transform:rotate(${open ? 180 : 0}deg)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>
       </button>
       ${open ? `<div style="padding:4px 14px 14px;border-top:1px solid var(--line2)">
