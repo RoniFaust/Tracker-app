@@ -391,7 +391,7 @@ const S = {
   day: null,            // date string when the day screen is open
   slot: 'כל היום', prep: 'ביתי', pending: null,   // food entry state
   comp: null,           // entry composer state
-  suppOpen: null, libOpen: false, openSec: {}
+  suppOpen: null, libOpen: false, openSec: {}, toolGrp: {}
 };
 
 const $view = document.getElementById('view');
@@ -908,20 +908,124 @@ function guessFoodCats(name) {
    ===================================================================== */
 const ACT_EXTRA = {};
 const TOOL_TYPES = ['נשימה', 'מדיטציה', 'יין יוגה', 'תרגול סומטי', 'טאפינג / לחיצות', 'מתיחות', 'אחר'];
-const FOCUS = ['כאב', 'סטרס', 'חרדה', 'עצב / דכדוך', 'בטן', 'שינה', 'כללי'];
+const FOCUS = ['כאב', 'סטרס', 'חרדה', 'עצב / דכדוך', 'ביקורת עצמית', 'תקיעות', 'בטן', 'שינה', 'כללי'];
+const FOCUS_Q = { 'כאב': 'הכאב', 'סטרס': 'הסטרס', 'חרדה': 'החרדה', 'עצב / דכדוך': 'העצב או הדכדוך', 'ביקורת עצמית': 'הביקורת העצמית', 'תקיעות': 'התקיעות', 'בטן': 'תסמיני הבטן', 'שינה': 'הקושי להירגע לשינה', 'כללי': 'הקושי' };
 const BREATH = {
   box:  { name: 'נשימת קופסה', desc: 'שאיפה 4 · עצירה 4 · נשיפה 4 · עצירה 4', phases: [['שאיפה', 4, 'in'], ['עצירה', 4, 'hold'], ['נשיפה', 4, 'out'], ['עצירה', 4, 'holdout']] },
   r478: { name: 'נשימת 4-7-8', desc: 'שאיפה 4 · עצירה 7 · נשיפה 8', phases: [['שאיפה', 4, 'in'], ['עצירה', 7, 'hold'], ['נשיפה', 8, 'out']] },
   long: { name: 'נשיפה ארוכה', desc: 'שאיפה 4 · נשיפה 6', phases: [['שאיפה', 4, 'in'], ['נשיפה', 6, 'out']] }
 };
+/* guided built-in practices (text on screen, no video) */
+const GUIDES = {
+  pmr: { name: 'הרפיית שרירים הדרגתית', type: 'הרפיה', auto: true, desc: 'מכווצים קבוצת שרירים 5 שניות ומשחררים 15. בערך 3 דקות.',
+    intro: 'שבי או שכבי בנוח. אם נוח לך, עצמי עיניים. אם אזור מסוים כואב, אפשר לדלג עליו או לכווץ בעדינות רבה.',
+    steps: [['כפות ידיים', 'אגרפי את שתי הידיים'], ['זרועות', 'כופפי מרפקים והדקי את הזרועות'], ['כתפיים', 'הרימי את הכתפיים לכיוון האוזניים'],
+      ['פנים', 'כווצי מצח, עיניים ולסת'], ['בטן', 'הדקי את הבטן בעדינות. אם כואב, דלגי'], ['ישבן וירכיים', 'הדקי את הישבן והירכיים'], ['רגליים', 'משכי את אצבעות הרגליים כלפי מעלה']],
+    outro: 'הישארי עוד רגע עם תחושת השחרור בכל הגוף. נשימה רגילה, בלי למהר.' },
+  compassion: { name: 'הפסקת חמלה עצמית', type: 'חמלה עצמית', desc: 'ארבעה צעדים קצרים, בקצב שלך. מבוסס על ה-Self-Compassion Break של Kristin Neff.',
+    steps: [['לשים לב', 'חשבי על מה שמכביד עכשיו. אמרי לעצמך בשקט: "זה רגע קשה. זה כואב."\nלא צריך לתקן או להסביר. רק להכיר בזה.'],
+      ['לא לבד', '"קושי הוא חלק מלהיות אדם." הרבה אנשים מכירים בדיוק את התחושה הזאת, גם אם לא רואים את זה מבחוץ.'],
+      ['טוב לב', 'הניחי יד על הלב, או במקום שמרגיש מנחם. שאלי: "מה אני צריכה לשמוע עכשיו?"\nואז אמרי את זה לעצמך, למשל: "שאהיה טובה אליי. שאסלח לעצמי."'],
+      ['כמו לחברה', 'דמייני שחברה קרובה מרגישה בדיוק ככה. מה היית אומרת לה, ובאיזה טון?\nנסי לומר את אותו משפט, באותו טון, לעצמך.']] },
+  ground: { name: 'הקרקעה 5-4-3-2-1', type: 'הקרקעה', desc: 'חוזרים לחושים, שלב אחרי שלב. אפשר בכל מקום, גם בעיניים פקוחות.',
+    steps: [['להתחיל', 'שימי לב לכפות הרגליים על הרצפה, ולמשקל הגוף על מה שמתחתייך. נשימה אחת רגילה.'],
+      ['5 דברים שאת רואה', 'תני שם לכל אחד, בשקט או בקול. צבע, צורה, פרט קטן שלא שמת לב אליו.'],
+      ['4 דברים שאת מרגישה', 'מגע הבגדים, הכיסא, הטמפרטורה של האוויר, היד שמונחת על משהו.'],
+      ['3 דברים שאת שומעת', 'קרובים ורחוקים. גם רעש רקע נחשב.'],
+      ['2 דברים שאת מריחה', 'אם אין ריח מורגש, אפשר לחשוב על שני ריחות שנעימים לך.'],
+      ['דבר אחד שאת טועמת', 'או תחושה אחת בפה. ואז נשימה איטית אחת, ולחזור לרגליים על הרצפה.']] },
+  step: { name: 'צעד קטן', type: 'צעד קטן', desc: 'בוחרים את הצעד הכי קטן שאפשר, ומתחילים אותו עם טיימר קצר.' },
+  write: { name: 'כתיבה חופשית', type: 'כתיבה', desc: 'כותבים בלי לערוך. בסוף בוחרים אם לשמור את הטקסט או למחוק אותו.',
+    prompts: ['כתיבה חופשית', 'מה מעיק עליי עכשיו?', 'מה הייתי אומרת לחברה במצב שלי?', 'מה אני מרגישה בגוף ובלב?', 'על מה אני מאשימה את עצמי, ומה עוד נכון?'] },
+  gratitude: { name: 'יומן תודה', type: 'יומן תודה', desc: 'שלושה דברים שאת מודה עליהם היום. גדולים או קטנים מאוד.' }
+};
+const WHEN = {
+  'b-box': 'כשצריך להתייצב מהר: לפני משהו מלחיץ, או באמצע הצפה.',
+  'b-478': 'לפני שינה, או כשהגוף דרוך ורוצים להאט.',
+  'b-long': 'בכאב, בעצב או בעייפות. קצב רגוע, ואפשר לעשות בשכיבה.',
+  'g-pmr': 'כשהגוף מתוח ודרוך, או כשקשה לשבת בשקט. בכאב חד באזור מסוים, דלגי עליו.',
+  'g-compassion': 'בשנאה עצמית, אשמה או ביקורת עצמית חזקה, ואחרי יום קשה.',
+  'g-ground': 'בחרדה, בהצפה או כשהמחשבות רצות. עובד גם בין אנשים.',
+  'g-step': 'בשיתוק ניהולי, כשמשימה מרגישה גדולה מדי ונמנעים מלהתחיל.',
+  'g-write': 'כשמחשבות חוזרות, באשמה, בכעס, או כשמשהו מעיק ואין למי לספר.',
+  'g-gratitude': 'בערב, או בימי דכדוך. לא כדי לבטל את הקושי, אלא כדי להרחיב את הקשב.'
+};
+
+/* yin yoga poses and somatic exercises: one tool each, timed, with written cues.
+   The user can attach her own YouTube video to any of them. */
+const POSES = {
+  'y-child': { name: 'תנוחת הילד הנתמכת', en: "Supported Child's Pose (Balasana)", group: 'yin', hold: [2, 3, 5],
+    how: ['כורעת על הברכיים, בהונות נוגעות זו בזו וברכיים רחבות', 'כרית או שמיכה מגולגלת לאורך בין הברכיים, ונשכבת עליה עם הבטן והחזה', 'הראש מוטה לצד אחד, ובאמצע הזמן מחליפה צד', 'ידיים רפויות לצדי הכרית'],
+    caution: 'ברכיים רחבות, כדי שלא יהיה לחץ על הבטן. אחרי ניתוח בטן, לבדוק קודם עם הרופא/ה.',
+    when: 'כאבי אגן וגב תחתון, ובסוף יום עמוס.', focus: ['כאב', 'סטרס'] },
+  'y-reclined-butterfly': { name: 'פרפר בשכיבה', en: 'Reclined Bound Angle (Supta Baddha Konasana)', group: 'yin', hold: [3, 5, 8],
+    how: ['שוכבת על הגב, כפות הרגליים צמודות זו לזו והברכיים נפתחות לצדדים', 'כרית או שמיכה מתחת לכל ברך, כך שהירכיים לא נמתחות בכוח', 'אפשר כרית לאורך עמוד השדרה ומתחת לראש', 'יד אחת על הבטן התחתונה, ונשימה איטית אל האגן'],
+    caution: 'אם יש משיכה במפשעה, להרים את הברכיים על עוד כריות.',
+    when: 'כאבי מחזור ואגן, כשרוצים לשכב ולא לזוז.', focus: ['כאב', 'בטן', 'סטרס'] },
+  'y-legs-wall': { name: 'רגליים על הקיר', en: 'Legs Up the Wall (Viparita Karani)', group: 'yin', hold: [3, 5, 8],
+    how: ['יושבת עם צד הגוף צמוד לקיר, ומסתובבת לשכיבה כשהרגליים עולות על הקיר', 'הישבן קרוב לקיר. אם הירך האחורית מתוחה, מתרחקים קצת', 'אפשר שמיכה מקופלת מתחת לאגן', 'ידיים לצדי הגוף, כפות פתוחות'],
+    caution: 'אם לא נעים, למשל בזמן המחזור, אפשר להניח את השוקיים על כיסא או ספה במקום על הקיר.',
+    when: 'עייפות, רגליים כבדות, לפני שינה.', focus: ['שינה', 'סטרס', 'כאב'] },
+  'y-twist': { name: 'פיתול בשכיבה', en: 'Supine Twist / Twisted Roots (Supta Matsyendrasana)', group: 'yin', hold: [2, 3, 4], sides: true,
+    how: ['שוכבת על הגב ומכופפת ברכיים', 'מורידה לאט את שתי הברכיים לצד אחד, עם כרית מתחתן אם הן לא מגיעות לרצפה', 'ידיים פתוחות לצדדים, מבט לתקרה או לצד השני', 'כשהטיימר מודיע, מחזירה את הברכיים למרכז ועוברת לצד השני'],
+    caution: 'פיתול עדין בלבד. אחרי ניתוח בטן, לבדוק קודם עם הרופא/ה.',
+    when: 'גב תחתון תפוס, נפיחות.', focus: ['כאב', 'בטן'] },
+  'y-happy-baby': { name: 'תינוק שמח', en: 'Happy Baby (Ananda Balasana)', group: 'yin', hold: [1, 2, 3],
+    how: ['שוכבת על הגב ומקרבת את הברכיים לחזה', 'אוחזת בכפות הרגליים, בקרסוליים או בחלק האחורי של הירכיים', 'ברכיים רחבות, ומושכת בעדינות לכיוון בתי השחי', 'אפשר להתנדנד לאט מצד לצד, וזה מעסה את הגב התחתון'],
+    caution: 'אם יש לחץ על הבטן או כאב, לעבור לחיבוק ברכיים פשוט. אחרי ניתוח בטן, לבדוק קודם עם הרופא/ה.',
+    when: 'גב תחתון וירכיים תפוסים.', focus: ['כאב'] },
+  'y-sphinx': { name: 'ספינקס', en: 'Sphinx', group: 'yin', hold: [2, 3, 4],
+    how: ['שוכבת על הבטן, אמות על הרצפה ומרפקים מתחת לכתפיים', 'החזה עולה, הצוואר ארוך והכתפיים רחוקות מהאוזניים', 'הישבן והרגליים רפויים', 'אם הגב התחתון לוחץ, מקדמים את המרפקים קצת קדימה'],
+    caution: 'יש לחץ על הבטן, ולכן התנוחה פחות מתאימה בימים של כאב בטן חזק או נפיחות. אחרי ניתוח בטן, לבדוק קודם עם הרופא/ה.',
+    when: 'גב עגול מישיבה ממושכת, בימים שהבטן רגועה.', focus: ['כאב'] },
+  'y-banana': { name: 'בננה', en: 'Bananasana', group: 'yin', hold: [2, 3, 4], sides: true,
+    how: ['שוכבת על הגב, ידיים מעל הראש', 'מזיזה את פלג הגוף העליון ואת הרגליים לאותו צד, כך שהגוף מתעקל כמו בננה', 'הישבן נשאר במקום, ומרגישים מתיחה לאורך הצד', 'כשהטיימר מודיע, חוזרת למרכז ועוברת לצד השני'],
+    caution: 'מתיחה עדינה, בלי לחץ על הגב.',
+    when: 'צד הגוף והגב התחתון תפוסים.', focus: ['כאב'] },
+  'y-savasana': { name: 'שכיבה לסיום', en: 'Savasana', group: 'yin', hold: [3, 5, 10],
+    how: ['שוכבת על הגב, כרית מתחת לברכיים', 'ידיים לצדי הגוף, כפות פתוחות', 'לא עושים כלום. רק נושמים ושמים לב לגוף'],
+    when: 'בסוף רצף, או לבד ביום של כאב או תשישות.', focus: ['כאב', 'שינה', 'סטרס'] },
+  's-butterfly': { name: 'חיבוק פרפר', en: 'Butterfly Hug', group: 'somatic', hold: [1, 2, 3],
+    how: ['מצליבה את הידיים על החזה, כך שכפות הידיים מונחות מתחת לעצמות הבריח או על הזרועות העליונות', 'אפשר לשלב את האגודלים, כמו גוף של פרפר', 'טופחת לסירוגין, ימין ואז שמאל, בקצב איטי ונעים', 'נושמת לאט ושמה לב לגוף. אם עולות מחשבות, לא צריך לעצור אותן'],
+    credit: 'פותח במסגרת טיפול EMDR על ידי Lucina Artigas.',
+    when: 'חרדה, הצפה, אחרי משהו מטלטל.', focus: ['חרדה', 'סטרס'] },
+  's-voo': { name: 'צליל "וו"', en: 'Voo Sound', group: 'somatic', hold: [1, 2, 3],
+    how: ['נושמת פנימה, ובנשיפה משמיעה צליל עמוק ונמוך, "וווווו", כמו קרן ערפל רחוקה', 'הצליל נמשך עד סוף הנשיפה, ומרגישים את הרטט בחזה ובבטן', 'מחכה רגע, עד שהשאיפה הבאה מגיעה מעצמה', 'חוזרת על זה לאורך כל הזמן'],
+    credit: 'תרגיל של Peter Levine (Somatic Experiencing).',
+    when: 'חרדה או סטרס שמורגשים בבטן ובחזה.', focus: ['חרדה', 'סטרס', 'בטן'] },
+  's-tapping': { name: 'טפיחות על הגוף', en: 'Body Tapping', group: 'somatic', hold: [1, 2, 3],
+    how: ['עומדת או יושבת, אגרופים רפויים או כפות פתוחות', 'טופחת בעדינות על זרוע אחת מהכתף עד כף היד ובחזרה, ואז על השנייה', 'ממשיכה לחזה העליון, לירכיים ולרגליים', 'בסוף עוצרת רגע בשקט ומרגישה את העקצוץ'],
+    when: 'שיתוק, ניתוק או כבדות, כשצריך "להתעורר" לגוף.', focus: ['תקיעות', 'עצב / דכדוך'] },
+  's-self-hold': { name: 'החזקה עצמית', en: 'Self-Holding', group: 'somatic', hold: [2, 3, 5],
+    how: ['יד אחת על המצח והשנייה על החזה', 'נשארת ככה ושמה לב למה שקורה בין הידיים, עד שמורגש שינוי קטן: חום, שקט או נשימה עמוקה יותר', 'מעבירה את היד מהמצח לבטן, ונשארת שוב', 'אין צורך לעשות שום דבר חוץ מלהחזיק'],
+    when: 'הצפה, בכי, כשקשה להירגע.', focus: ['חרדה', 'סטרס', 'עצב / דכדוך'] },
+  's-shake': { name: 'ניעור', en: 'Shaking', group: 'somatic', hold: [1, 2],
+    how: ['עומדת, ברכיים רכות', 'מתחילה לנער את הידיים, אחר כך את הכתפיים, הרגליים וכל הגוף', 'לא צריך שזה ייראה בצורה מסוימת. אפשר גם להוציא קול', 'עוצרת בבת אחת, ועומדת בשקט כמה נשימות'],
+    caution: 'פחות מתאים בכאב חזק או בסחרחורת. אפשר לנער רק את הידיים, בישיבה.',
+    when: 'סטרס שתקוע בגוף, אחרי מצב מלחיץ.', focus: ['סטרס', 'תקיעות'] },
+  's-orient': { name: 'התמצאות במרחב', en: 'Orienting', group: 'somatic', hold: [1, 2, 3],
+    how: ['מסובבת לאט את הראש ואת העיניים, ומסתכלת סביב החדר', 'עוצרת על דברים שנעים להסתכל עליהם: צבע, אור, צמח', 'נותנת לעיניים להוביל, בלי למהר', 'בסוף שמה לב: משהו השתנה בנשימה או בכתפיים?'],
+    when: 'חרדה, דריכות, תחושת סכנה בלי סיבה ברורה.', focus: ['חרדה'] },
+  's-stroke': { name: 'ליטוף זרועות', en: 'Arm Stroking', group: 'somatic', hold: [1, 2, 3],
+    how: ['מצליבה ידיים ומניחה את כפות הידיים על הכתפיים', 'מלטפת לאט כלפי מטה עד המרפקים, וחוזרת להתחיל מהכתפיים', 'קצב איטי ומגע נעים', 'אפשר לדמיין במקביל מקום רגוע'],
+    when: 'חרדה, בדידות, צורך במגע מרגיע.', focus: ['חרדה', 'עצב / דכדוך'] }
+};
+Object.keys(POSES).forEach(id => { WHEN[id] = POSES[id].when; });
 function defaultTools() {
+  const g = (k, focus) => ({ id: 'g-' + k, name: GUIDES[k].name, type: GUIDES[k].type, guide: k, focus, goal: null, builtin: true });
   return [
     { id: 'b-box', name: BREATH.box.name, type: 'נשימה', breath: 'box', focus: ['סטרס', 'חרדה'], goal: null, builtin: true },
     { id: 'b-478', name: BREATH.r478.name, type: 'נשימה', breath: 'r478', focus: ['חרדה', 'שינה'], goal: null, builtin: true },
-    { id: 'b-long', name: BREATH.long.name, type: 'נשימה', breath: 'long', focus: ['כאב', 'סטרס', 'עצב / דכדוך'], goal: null, builtin: true }
-  ];
+    { id: 'b-long', name: BREATH.long.name, type: 'נשימה', breath: 'long', focus: ['כאב', 'סטרס', 'עצב / דכדוך'], goal: null, builtin: true },
+    g('pmr', ['סטרס', 'חרדה', 'שינה']), g('compassion', ['ביקורת עצמית', 'עצב / דכדוך']), g('ground', ['חרדה', 'סטרס']),
+    g('step', ['תקיעות']), g('write', ['ביקורת עצמית', 'סטרס', 'עצב / דכדוך']), g('gratitude', ['עצב / דכדוך', 'כללי'])
+  ].concat(Object.keys(POSES).map(id => ({ id, name: POSES[id].name, type: POSES[id].group === 'yin' ? 'יין יוגה' : 'תרגול סומטי', pose: id, focus: POSES[id].focus.slice(), goal: null, builtin: true, url: '' })));
 }
-function ensureTools() { if (!DATA.tools) DATA.tools = defaultTools(); }
+// add any built-in tool the saved list doesn't have yet (keeps the user's goals/edits on existing ones)
+function ensureTools() {
+  if (!DATA.tools) { DATA.tools = defaultTools(); return; }
+  defaultTools().forEach(d => { if (!DATA.tools.some(x => x.id === d.id)) DATA.tools.push(d); });
+}
 const toolById = id => (DATA.tools || []).find(t => t.id === id);
 function daySessions(s) { return getDay(s).sessions || []; }
 
@@ -951,14 +1055,24 @@ function renderTools() {
   const goals = withGoal.map(x => { const p = goalProgress(x, t); const pct = Math.min(100, Math.round(p.done / p.n * 100));
     return `<div class="row" style="margin:8px 0"><span class="small" style="width:120px;flex:0 0 auto">${esc(x.name)}</span><div class="bar" style="flex:1"><div style="width:${pct}%;background:var(--accent)"></div></div><b class="small" style="width:64px;text-align:left">${p.done}/${p.n} ${p.label}</b></div>`; }).join('');
   const todays = daySessions(t).map(z => Object.assign({ day: t }, z));
-  const group = (title, list) => list.length ? `<div class="lbl">${title}</div>${list.map(toolRow).join('')}` : '';
+  const group = (key, title, list) => {
+    if (!list.length) return '';
+    const open = S.toolGrp[key] != null ? S.toolGrp[key] : key === 'mine';
+    return `<button type="button" class="between" style="width:100%;min-height:48px;background:none;border:none;border-top:1px solid var(--line2);padding:0;text-align:right" data-act="toolGrp" data-a="${key}" aria-expanded="${open}">
+      <span><b style="font-size:16px">${title}</b> <span class="small muted">· ${list.length}</span></span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="transform:rotate(${open ? 180 : 0}deg)"><path d="M6 9l6 6 6-6"/></svg></button>
+      ${open ? list.map(toolRow).join('') : ''}`;
+  };
   $view.innerHTML = `
     <div style="padding-top:18px"><h1>ארגז כלים</h1><div class="small muted" style="margin-top:4px">נשימות, מדיטציות ותרגולים. כל שימוש נרשם עם משך ועוצמה לפני ואחרי.</div></div>
     ${goals ? `<section class="card"><h2>יעדים</h2>${goals}</section>` : ''}
     ${todays.length ? `<section class="card"><h2>היום</h2>${todays.map(sessionRow).join('')}</section>` : ''}
     <section class="card">
-      ${group('נשימות', DATA.tools.filter(x => x.breath))}
-      ${group('התרגולים שלי', DATA.tools.filter(x => !x.breath))}
+      ${group('breath', 'נשימות', DATA.tools.filter(x => x.breath))}
+      ${group('guide', 'תרגולים מודרכים', DATA.tools.filter(x => x.guide))}
+      ${group('yin', 'יין יוגה', DATA.tools.filter(x => x.pose && POSES[x.pose].group === 'yin'))}
+      ${group('somatic', 'תרגילים סומטיים', DATA.tools.filter(x => x.pose && POSES[x.pose].group === 'somatic'))}
+      ${group('mine', 'התרגולים שלי', DATA.tools.filter(x => !x.breath && !x.guide && !x.pose))}
       <button class="btn soft block" style="margin-top:12px" data-act="toolNew">+ הוספת תרגול</button>
     </section>`;
 }
@@ -966,7 +1080,7 @@ function toolRow(x) {
   const meta = [x.type, (x.focus || []).join(', '), x.goal ? 'יעד: ' + goalText(x.goal) : ''].filter(Boolean).join(' · ');
   return `<div class="between" style="padding:10px 0;border-top:1px solid var(--line2)">
     <button type="button" style="flex:1;min-width:0;text-align:right;background:none;border:none;padding:0" data-act="toolEdit" data-a="${x.id}" aria-label="עריכת ${esc(x.name)}">
-      <span style="display:block;font-weight:700">${esc(x.name)}</span><span class="xs muted">${esc(meta)}</span></button>
+      <span style="display:block;font-weight:700">${esc(x.name)}${x.pose ? ` <span class="xs muted" style="font-weight:600" dir="ltr">${esc(POSES[x.pose].en)}</span>` : ''}${x.url ? ' <span class="xs" style="color:var(--accent)">· וידאו</span>' : ''}</span>${WHEN[x.id] ? `<span style="display:block;font-size:13px;color:var(--ink2);margin:1px 0">${esc(WHEN[x.id])}</span>` : ''}<span class="xs muted">${esc(meta)}</span></button>
     <button class="btn" style="min-height:42px;padding:0 16px;flex:0 0 auto" data-act="toolStart" data-a="${x.id}">התחלה</button></div>`;
 }
 function sessionRow(z) {
@@ -976,6 +1090,7 @@ function sessionRow(z) {
   return `<div class="tl-item"><span class="tl-time">${esc(z.t)}</span><span class="dot" style="background:var(--accent);margin-top:7px"></span>
     <span style="flex:1;min-width:0"><span style="display:block;font-weight:700">${esc(z.name)}</span>
     <span style="display:block;font-size:13px;color:var(--muted)">${mins} דק׳${z.focus ? ' · ' + esc(z.focus) : ''}${dtxt}</span>
+    ${z.text ? `<span style="display:block;font-size:13px;color:var(--ink2);white-space:pre-line;margin-top:2px">${esc(sessText(z))}</span>` : ''}
     ${z.note ? `<span style="display:block;font-size:13px;color:var(--ink2);font-style:italic">${esc(z.note)}</span>` : ''}</span>
     <button class="iconbtn" style="width:36px;height:36px;color:var(--muted)" aria-label="מחיקת התרגול" data-act="sessDel" data-a="${z.day}|${z.id}">${ICON.x}</button></div>`;
 }
@@ -986,7 +1101,9 @@ function renderToolEditor() {
   const g = x.goal || { per: 'none', n: 3 };
   $panel.innerHTML = `
     <div class="between"><h2 style="margin:0">${x._new ? 'תרגול חדש' : 'עריכת תרגול'}</h2><button class="iconbtn" aria-label="סגירה" data-act="sheetClose">${ICON.x}</button></div>
-    ${x.breath ? `<div class="small muted" style="margin:6px 0 4px">${esc(BREATH[x.breath].desc)}</div>` : `
+    ${x.pose ? `<div class="small muted" style="margin:6px 0 4px" dir="auto">${esc(POSES[x.pose].en)} · ${esc(POSES[x.pose].when)}</div>
+    <label class="lbl" style="display:block" for="tUrl">סרטון YouTube שמדגים (לא חובה)</label><input id="tUrl" class="input" style="background:#fff" dir="ltr" value="${esc(x.url || '')}" placeholder="https://youtu.be/…" data-input="tUrl">
+    <div class="xs muted" style="margin-top:4px">הסרטון יופיע מעל ההוראות בזמן התרגול.</div>` : x.breath || x.guide ? `<div class="small muted" style="margin:6px 0 4px">${esc(x.breath ? BREATH[x.breath].desc : GUIDES[x.guide].desc)}</div>` : `
     <label class="lbl" style="display:block" for="tName">שם</label><input id="tName" class="input" style="background:#fff" value="${esc(x.name)}" placeholder="לדוגמה: מדיטציה לכאב – 10 דק׳" data-input="tName">
     <div class="lbl">סוג</div><div class="wrap">${TOOL_TYPES.filter(y => y !== 'נשימה').map(y => chip(y, x.type === y, 'tSet', 'type::' + y)).join('')}</div>
     <label class="lbl" style="display:block" for="tUrl">קישור (YouTube או כל אתר, לא חובה)</label><input id="tUrl" class="input" style="background:#fff" dir="ltr" value="${esc(x.url || '')}" placeholder="https://youtu.be/…" data-input="tUrl">
@@ -1002,8 +1119,10 @@ function renderToolEditor() {
 let sessTimer = null, breathTimer = null, wakeLock = null;
 function startSession(toolId, focus, before) {
   const x = toolById(toolId); if (!x) return;
-  S.sess = { tool: x.id, step: 'before', focus: focus || (x.focus || [])[0] || 'כללי', before: before != null ? before : null, after: null, dur: 0, start: 0, note: '', mins: 5, day: todayS() };
+  S.sess = { tool: x.id, step: 'before', focus: focus || (x.focus || [])[0] || 'כללי', before: before != null ? before : null, after: null, dur: 0, start: 0, note: '', mins: 5, day: todayS(),
+    g: { i: 0, prompt: x.guide === 'write' ? GUIDES.write.prompts[0] : '', text: '', grat: ['', '', ''], task: '', step: '', stepMins: 2, running: false, end: 0 }, keep: x.guide === 'write' ? false : true };
   if (!$sheet.classList.contains('open')) { history.pushState({ v: 'sheet' }, ''); $sheet.classList.add('open'); document.body.style.overflow = 'hidden'; }
+  if (x.pose) { const h = POSES[x.pose].hold; S.sess.mins = h[Math.min(1, h.length - 1)]; }
   renderSession();
 }
 function scale10(field, val) {
@@ -1016,15 +1135,19 @@ function renderSession() {
   const head = `<div class="between"><h2 style="margin:0">${esc(x.name)}</h2><button class="iconbtn" aria-label="סגירה" data-act="sessCancel">${ICON.x}</button></div>`;
   if (z.step === 'before') {
     $panel.innerHTML = `${head}
+      ${WHEN[x.id] ? `<div class="small" style="color:var(--ink2);margin-top:6px">${esc(WHEN[x.id])}</div>` : ''}
       <div class="lbl">על מה עובדים עכשיו?</div><div class="wrap">${FOCUS.map(f => chip(f, z.focus === f, 'sFocus', f)).join('')}</div>
-      <div class="lbl">כמה ${z.focus === 'כללי' ? 'זה מורגש' : 'חזק ה' + z.focus.split(' ')[0]} עכשיו? (לא חובה)</div>${scale10('before', z.before)}
+      <div class="lbl">מה העוצמה של ${esc(FOCUS_Q[z.focus] || z.focus)} עכשיו? (לא חובה)</div>${scale10('before', z.before)}
+      ${x.pose ? `<div class="lbl">משך${POSES[x.pose].sides ? ' לכל צד' : ''}</div><div class="wrap">${POSES[x.pose].hold.map(m => chip(m + ' דק׳', z.mins === m, 'sMins', String(m))).join('')}</div>` : ''}
       ${x.breath ? `<div class="lbl">משך</div><div class="wrap">${[2, 5, 10].map(m => chip(m + ' דק׳', z.mins === m, 'sMins', String(m))).join('')}${chip('בלי הגבלה', z.mins === 0, 'sMins', '0')}</div>` : ''}
       <button class="btn block" style="margin-top:16px" data-act="sGo">התחלה</button>`;
     return;
   }
   if (z.step === 'run') {
     let body = '';
-    if (x.breath) {
+    if (x.pose) body = poseBody(x, z);
+    else if (x.guide) body = guideBody(x, z);
+    else if (x.breath) {
       body = `<div style="display:flex;flex-direction:column;align-items:center;padding:18px 0 6px">
         <div style="position:relative;width:240px;height:240px;display:flex;align-items:center;justify-content:center">
           <div id="bCircle" style="position:absolute;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle at 50% 45%, #8B6BA8, #5B3A7A);transform:scale(.45);transition:transform 1s ease-in-out"></div>
@@ -1042,14 +1165,17 @@ function renderSession() {
     }
     $panel.innerHTML = `${head}${body}
       <div style="text-align:center;margin-top:10px"><span class="small muted">זמן</span> <b id="sClock" style="font-size:20px;font-variant-numeric:tabular-nums">0:00</b>${x.breath && z.mins ? ` <span class="small muted">/ ${z.mins}:00</span>` : ''}</div>
-      <button class="btn block" style="margin-top:12px" data-act="sDone">סיימתי</button>`;
-    runTimers(x);
+      ${x.guide && GUIDES[x.guide].steps && !GUIDES[x.guide].auto ? '' : `<button class="btn block" style="margin-top:12px" data-act="sDone">סיימתי</button>`}`;
+    if (!z.start) runTimers(x); else if (x.guide === 'step' && z.g.running) tickStep();
     return;
   }
   // after
   $panel.innerHTML = `${head}
     <div class="small" style="color:var(--ink2);margin-top:6px">משך: ${Math.max(1, Math.round(z.dur / 60))} דק׳</div>
-    <div class="lbl">ועכשיו, כמה חזק ה${esc(z.focus === 'כללי' ? 'תחושה' : z.focus.split(' ')[0])}?${z.before != null ? ` <span class="muted">(לפני: ${z.before})</span>` : ''}</div>${scale10('after', z.after)}
+    <div class="lbl">ועכשיו, מה העוצמה של ${esc(FOCUS_Q[z.focus] || z.focus)}?${z.before != null ? ` <span class="muted">(לפני: ${z.before})</span>` : ''}</div>${scale10('after', z.after)}
+    ${['write', 'gratitude', 'step'].includes(x.guide) && hasText(z) ? `<div class="lbl">מה שכתבת</div>
+      <div class="wrap">${chip('לשמור ביומן', z.keep, 'sKeep', '1')}${chip(x.guide === 'write' ? 'לא לשמור (יימחק)' : 'לא לשמור', !z.keep, 'sKeep', '0')}</div>
+      <div class="xs muted" style="margin-top:6px">${z.keep ? 'הטקסט יישמר ביום הזה ויופיע בקובץ הייצוא.' : 'הטקסט יימחק ברגע השמירה. יישמרו רק הזמן והדירוג.'}</div>` : ''}
     <label class="lbl" style="display:block" for="sNote">הערה (לא חובה)</label><textarea id="sNote" class="input" style="background:#fff" rows="2" data-input="sNote">${esc(z.note)}</textarea>
     <button class="btn block" style="margin-top:16px" data-act="sSave">שמירה</button>`;
 }
@@ -1064,6 +1190,8 @@ function runTimers(x) {
     if (el) el.textContent = fmtClock(sec);
     if (x.breath && z.mins && sec >= z.mins * 60) ACT.sDone();
   }, 250);
+  if (x.guide === 'pmr') { runPmr(); return; }
+  if (x.pose) { runPose(x); return; }
   if (!x.breath) return;
   const ph = BREATH[x.breath].phases; let i = 0;
   const step = () => {
@@ -1089,8 +1217,10 @@ function suggestFor(entry) {
   else if (entry.kind === 'belly' && SEVERITY.indexOf(entry.sev) >= 2) { focus = 'בטן'; }
   else if (entry.kind === 'mood') {
     const fams = new Set((entry.emos || []).map(w => (famOfWord(w) || {}).id));
-    if (fams.has('stress')) focus = (entry.emos || []).includes('חרדה') ? 'חרדה' : 'סטרס';
-    else if (fams.has('sad') || fams.has('low') || fams.has('self')) focus = 'עצב / דכדוך';
+    if ((entry.emos || []).includes('שיתוק ניהולי')) focus = 'תקיעות';
+    else if (fams.has('self')) focus = 'ביקורת עצמית';
+    else if (fams.has('stress')) focus = (entry.emos || []).includes('חרדה') ? 'חרדה' : 'סטרס';
+    else if (fams.has('sad') || fams.has('low')) focus = 'עצב / דכדוך';
     else if (fams.has('anger')) focus = 'סטרס';
     else if (entry.score && entry.score <= 2) focus = 'כללי';
   }
@@ -1102,7 +1232,7 @@ function suggestFor(entry) {
 function suggestCard() {
   const g = S.suggest; if (!g || S.day !== todayS()) return '';
   return `<section class="card" style="background:var(--accent-soft);border-color:#D9CCE4">
-    <div class="between"><h2 style="margin:0">רוצה לנסות משהו ל${esc(g.focus === 'כללי' ? 'הרגשה' : g.focus.split(' ')[0])}?</h2><button class="iconbtn" aria-label="לא עכשיו" data-act="suggestOff">${ICON.x}</button></div>
+    <div class="between"><h2 style="margin:0;font-size:16px">רוצה לנסות משהו שיעזור עם ${esc(FOCUS_Q[g.focus] || g.focus)}?</h2><button class="iconbtn" aria-label="לא עכשיו" data-act="suggestOff">${ICON.x}</button></div>
     <div class="wrap" style="margin-top:6px">${g.tools.map(id => { const x = toolById(id); return x ? `<button class="chip" data-act="suggestGo" data-a="${id}">${esc(x.name)}</button>` : ''; }).join('')}</div></section>`;
 }
 function sessionsCard(s) {
@@ -1125,8 +1255,132 @@ function toolInsights() {
     <div class="xs muted" style="margin-top:6px">מוצג אחרי לפחות 2 שימושים עם דירוג לפני ואחרי. ירידה מיד אחרי תרגול לא אומרת בהכרח שהתרגול הוא הסיבה.</div></section>`;
 }
 
+/* ---------- guided practices ---------- */
+function hasText(z) { if (!z || !z.g) return false; const g = z.g; return !!(g.text.trim() || g.grat.some(s => s.trim()) || g.step.trim() || g.task.trim()); }
+function sessText(z) {
+  const t = z.text; if (!t) return '';
+  if (Array.isArray(t)) return t.map((s, i) => (i + 1) + '. ' + s).join('\n');
+  if (t.step != null) return (t.task ? 'משימה: ' + t.task + '\n' : '') + 'צעד: ' + t.step;
+  return (t.prompt && t.prompt !== 'כתיבה חופשית' ? t.prompt + '\n' : '') + t.body;
+}
+function guideBody(x, z) {
+  const G = GUIDES[x.guide], g = z.g;
+  if (x.guide === 'pmr') return `<div class="card" style="margin-top:12px;text-align:center;padding:22px 16px">
+      <div id="pPhase" class="small" style="font-weight:800;color:var(--accent);letter-spacing:.02em">מתחילים</div>
+      <div id="pTitle" class="serif" style="font-size:26px;font-weight:700;margin:6px 0">${esc(G.intro.split('.')[0])}</div>
+      <div id="pText" style="font-size:16px;color:var(--ink2);min-height:48px">${esc(G.intro)}</div>
+      <div id="pCount" style="font-size:34px;font-weight:800;color:var(--accent);margin-top:8px;font-variant-numeric:tabular-nums"></div>
+      <div id="pProg" class="xs muted" style="margin-top:6px"></div></div>`;
+  if (G.steps) {
+    const n = G.steps.length, [title, text] = G.steps[g.i];
+    return `<div class="xs muted" style="margin-top:10px">${g.i + 1} מתוך ${n}</div>
+      <div class="card" style="margin-top:6px;padding:20px 16px"><div class="serif" style="font-size:24px;font-weight:700;margin-bottom:8px">${esc(title)}</div>
+      <div style="font-size:17px;line-height:1.55;white-space:pre-line">${esc(text)}</div></div>
+      <div class="row" style="margin-top:12px">${g.i > 0 ? `<button class="btn ghost" data-act="gPrev">הקודם</button>` : ''}
+        ${g.i < n - 1 ? `<button class="btn" style="flex:1" data-act="gNext">הבא</button>` : `<button class="btn" style="flex:1" data-act="sDone">סיימתי</button>`}</div>
+      ${x.guide === 'compassion' ? '<div class="xs muted" style="margin-top:8px">אין קצב נכון. אפשר להישאר בכל שלב כמה שצריך.</div>' : ''}`;
+  }
+  if (x.guide === 'step') {
+    if (!g.running && !g.end) return `
+      <label class="lbl" style="display:block" for="gTask">מה המשימה שתקועה? (לא חובה)</label>
+      <input id="gTask" class="input" style="background:#fff" value="${esc(g.task)}" placeholder="לדוגמה: הפרק השלישי" data-input="gTask">
+      <label class="lbl" style="display:block" for="gStep">מה הצעד הכי קטן שאפשר לעשות עכשיו?</label>
+      <input id="gStep" class="input" style="background:#fff" value="${esc(g.step)}" placeholder="לדוגמה: לפתוח את הקובץ ולקרוא את הפסקה האחרונה" data-input="gStep">
+      <div class="xs muted" style="margin-top:6px">כל כך קטן שמרגיש כמעט מגוחך. לא "לכתוב את הפרק" אלא "לפתוח את הקובץ".</div>
+      <div class="lbl">כמה זמן?</div><div class="wrap">${[2, 5, 10].map(m => chip(m + ' דק׳', g.stepMins === m, 'gStepMins', String(m))).join('')}</div>
+      <button class="btn block" style="margin-top:14px" data-act="gStepGo">יאללה, מתחילה</button>`;
+    return `<div class="card" style="margin-top:12px;text-align:center;padding:22px 16px">
+      <div class="small muted">הצעד שלך</div><div style="font-size:19px;font-weight:700;margin:6px 0 10px">${esc(g.step || 'הצעד הקטן')}</div>
+      <div id="gLeft" style="font-size:40px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums">${fmtClock(g.stepMins * 60)}</div>
+      <div id="gMsg" class="small" style="color:var(--ink2);margin-top:6px">${g.end && Date.now() >= g.end ? 'הזמן נגמר. אפשר לעצור כאן, זה כבר נחשב. ואפשר להמשיך אם בא לך.' : 'רק את הצעד הזה. שום דבר מעבר.'}</div></div>`;
+  }
+  if (x.guide === 'write') return `
+      <div class="lbl">נקודת פתיחה</div><div class="wrap">${G.prompts.map(p => chip(p, g.prompt === p, 'gPrompt', p)).join('')}</div>
+      ${g.prompt !== 'כתיבה חופשית' ? `<div class="serif" style="font-size:19px;font-weight:700;margin-top:12px">${esc(g.prompt)}</div>` : ''}
+      <textarea id="gText" class="input" style="background:#fff;margin-top:10px;min-height:220px;font-size:16px;line-height:1.5" placeholder="לכתוב בלי לעצור ובלי לתקן…" data-input="gText">${esc(g.text)}</textarea>
+      <div class="xs muted" style="margin-top:6px">בסוף תבחרי אם לשמור. ברירת המחדל: לא לשמור.</div>`;
+  if (x.guide === 'gratitude') return `<div class="small" style="color:var(--ink2);margin-top:8px">שלושה דברים מהיום שאת מודה עליהם. גם דברים קטנים מאוד נחשבים: כוס קפה, הודעה ממישהי, רגע של שקט.</div>
+      ${[0, 1, 2].map(i => `<label class="lbl" style="display:block" for="gr${i}">${i + 1}.</label><input id="gr${i}" class="input" style="background:#fff" value="${esc(g.grat[i])}" data-input="gGrat" data-a="${i}">`).join('')}`;
+  return '';
+}
+function runPmr() {
+  const G = GUIDES.pmr, seq = [['intro', 10]];
+  G.steps.forEach((s, i) => { seq.push(['tense', 5, i]); seq.push(['release', 15, i]); });
+  seq.push(['outro', 12]);
+  let k = 0;
+  const show = () => {
+    const ph = document.getElementById('pPhase'); if (!ph) return;
+    if (k >= seq.length) { ACT.sDone(); return; }
+    const [kind, secs, i] = seq[k];
+    const title = kind === 'intro' ? 'מתכוננים' : kind === 'outro' ? 'שחרור מלא' : G.steps[i][0];
+    ph.textContent = kind === 'tense' ? 'לכווץ' : kind === 'release' ? 'לשחרר' : kind === 'intro' ? 'מתחילים' : 'סיום';
+    ph.style.color = kind === 'tense' ? '#A3324A' : 'var(--accent)';
+    document.getElementById('pTitle').textContent = title;
+    document.getElementById('pText').textContent = kind === 'tense' ? G.steps[i][1] : kind === 'release' ? 'לשחרר בבת אחת, ולהרגיש את ההבדל בין מתוח לרפוי.' : kind === 'intro' ? G.intro : G.outro;
+    document.getElementById('pProg').textContent = i != null ? (i + 1) + ' מתוך ' + G.steps.length : '';
+    let left = secs; const cnt = document.getElementById('pCount'); cnt.textContent = left;
+    const tick = () => { left--; const c = document.getElementById('pCount'); if (!c) return; if (left > 0) { c.textContent = left; breathTimer = setTimeout(tick, 1000); } else { k++; show(); } };
+    breathTimer = setTimeout(tick, 1000);
+  };
+  breathTimer = setTimeout(show, 300);
+}
+function tickStep() {
+  clearTimeout(breathTimer);
+  const g = S.sess.g;
+  const loop = () => {
+    const el = document.getElementById('gLeft'); if (!el) return;
+    const left = Math.max(0, Math.round((g.end - Date.now()) / 1000));
+    el.textContent = fmtClock(left);
+    if (left <= 0) { g.running = false; const m = document.getElementById('gMsg'); if (m) m.textContent = 'הזמן נגמר. אפשר לעצור כאן, זה כבר נחשב. ואפשר להמשיך אם בא לך.'; try { navigator.vibrate && navigator.vibrate(200); } catch (e) {} return; }
+    breathTimer = setTimeout(loop, 500);
+  };
+  loop();
+}
+
+function poseBody(x, z) {
+  const P = POSES[x.pose], yid = ytId(x.url);
+  return `${yid ? `<div style="position:relative;width:100%;padding-top:56.25%;border-radius:14px;overflow:hidden;background:#000;margin-top:10px">
+      <iframe src="https://www.youtube-nocookie.com/embed/${yid}?rel=0&playsinline=1" title="${esc(x.name)}" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>
+      <a class="small" href="${esc(x.url)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;font-weight:700">לא מתנגן כאן? פתיחה ב-YouTube</a>` : ''}
+    <div class="card" style="margin-top:10px;text-align:center;padding:16px">
+      <div id="pSide" class="small" style="font-weight:800;color:var(--accent)">${P.sides ? 'צד ראשון' : 'להחזיק'}</div>
+      <div id="pLeft" style="font-size:40px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums">${fmtClock(z.mins * 60)}</div>
+      <div id="pMsg" class="xs muted"></div></div>
+    <div class="xs muted" dir="ltr" style="text-align:right;margin-top:10px">${esc(P.en)}</div>
+    <ol style="margin:6px 0 0;padding-inline-start:22px;font-size:16px;line-height:1.55">${P.how.map(h => `<li style="margin-bottom:6px">${esc(h)}</li>`).join('')}</ol>
+    ${P.caution ? `<div class="small" style="margin-top:8px;padding:10px 12px;border-radius:12px;background:#FBF5E6;border:1px solid #EAD9AE">${esc(P.caution)}</div>` : ''}
+    ${P.credit ? `<div class="xs muted" style="margin-top:6px">${esc(P.credit)}</div>` : ''}
+    ${P.group === 'yin' ? '<div class="xs muted" style="margin-top:6px">מחפשים תחושה של מתיחה או שחרור, לא כאב. אם משהו כואב, יוצאים מהתנוחה.</div>' : ''}`;
+}
+function runPose(x) {
+  const P = POSES[x.pose], z = S.sess, per = z.mins * 60;
+  const total = P.sides ? per * 2 : per;
+  let switched = false;
+  const loop = () => {
+    const el = document.getElementById('pLeft'); if (!el) return;
+    const sec = (Date.now() - z.start) / 1000;
+    if (sec >= total) { try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} ACT.sDone(); return; }
+    const inSide = P.sides && sec >= per ? sec - per : sec;
+    el.textContent = fmtClock(Math.ceil(per - inSide));
+    if (P.sides && sec >= per && !switched) {
+      switched = true; try { navigator.vibrate && navigator.vibrate(300); } catch (e) {}
+      document.getElementById('pSide').textContent = 'צד שני';
+      document.getElementById('pMsg').textContent = 'לאט חזרה למרכז, ומעבר לצד השני.';
+    }
+    breathTimer = setTimeout(loop, 400);
+  };
+  loop();
+}
+
 /* ---------- actions ---------- */
 Object.assign(ACT_EXTRA, {
+  toolGrp: a => { const cur = S.toolGrp[a] != null ? S.toolGrp[a] : a === 'mine'; S.toolGrp[a] = !cur; render(); },
+  gNext: () => { S.sess.g.i++; renderSession(); },
+  gPrev: () => { S.sess.g.i = Math.max(0, S.sess.g.i - 1); renderSession(); },
+  gPrompt: a => { S.sess.g.prompt = a; renderSession(); },
+  gStepMins: a => { S.sess.g.stepMins = Number(a); renderSession(); },
+  gStepGo: () => { const g = S.sess.g; g.running = true; g.end = Date.now() + g.stepMins * 60000; renderSession(); },
+  sKeep: a => { S.sess.keep = a === '1'; renderSession(); },
   toolNew: () => { ensureTools(); S.toolEd = { _new: true, id: uid(), name: '', type: 'מדיטציה', url: '', text: '', focus: [], goal: null }; history.pushState({ v: 'sheet' }, ''); $sheet.classList.add('open'); document.body.style.overflow = 'hidden'; renderToolEditor(); },
   toolEdit: a => { S.toolEd = JSON.parse(JSON.stringify(toolById(a))); history.pushState({ v: 'sheet' }, ''); $sheet.classList.add('open'); document.body.style.overflow = 'hidden'; renderToolEditor(); },
   tSet: a => { const [f, v] = a.split('::'); S.toolEd[f] = v; renderToolEditor(); },
@@ -1150,11 +1404,14 @@ Object.assign(ACT_EXTRA, {
   sSave: () => {
     const z = S.sess, x = toolById(z.tool), d = editDay(z.day);
     d.sessions = d.sessions || [];
-    d.sessions.push({ id: uid(), t: new Date(z.start).toTimeString().slice(0, 5), tool: x.id, name: x.name, type: x.type, focus: z.focus, before: z.before, after: z.after, dur: z.dur, note: (z.note || '').trim() });
+    const rec = { id: uid(), t: new Date(z.start).toTimeString().slice(0, 5), tool: x.id, name: x.name, type: x.type, focus: z.focus, before: z.before, after: z.after, dur: z.dur, note: (z.note || '').trim() };
+    if (z.keep && hasText(z)) rec.text = x.guide === 'gratitude' ? z.g.grat.map(s => s.trim()).filter(Boolean) : x.guide === 'step' ? { task: z.g.task.trim(), step: z.g.step.trim() } : x.guide === 'write' ? { prompt: z.g.prompt, body: z.g.text.trim() } : undefined;
+    z.g.text = ''; z.g.grat = ['', '', ''];
+    d.sessions.push(rec);
     S.suggest = null; save(); ACT.sheetClose(); render();
     const p = goalProgress(x, z.day); toast(p ? 'נשמר · ' + p.label + ': ' + p.done + '/' + p.n : 'נשמר');
   },
-  sessCancel: () => { if (S.sess && S.sess.step === 'run' && !confirm('לצאת בלי לשמור?')) return; stopTimers(); S.sess = null; ACT.sheetClose(); },
+  sessCancel: () => { if (S.sess && (S.sess.step === 'run' || hasText(S.sess)) && !confirm(hasText(S.sess) ? 'לצאת? מה שכתבת יימחק.' : 'לצאת בלי לשמור?')) return; stopTimers(); S.sess = null; ACT.sheetClose(); },
   sessDel: a => { const [s, id] = a.split('|'); if (!confirm('למחוק את רישום התרגול?')) return; const d = editDay(s); d.sessions = (d.sessions || []).filter(z => z.id !== id); save(); render(); },
   suggestGo: a => startSession(a, S.suggest.focus, S.suggest.level),
   suggestOff: () => { S.suggest = null; render(); },
@@ -1481,6 +1738,10 @@ document.addEventListener('input', e => {
   else if (k === 'tUrl') S.toolEd.url = el.value.trim();
   else if (k === 'tText') S.toolEd.text = el.value;
   else if (k === 'sNote') S.sess.note = el.value;
+  else if (k === 'gText') S.sess.g.text = el.value;
+  else if (k === 'gTask') S.sess.g.task = el.value;
+  else if (k === 'gStep') S.sess.g.step = el.value;
+  else if (k === 'gGrat') S.sess.g.grat[Number(el.dataset.a)] = el.value;
   else if (k === 'suppAt') { const d = editDay(S.day); d.supp[el.dataset.a] = el.value || true; save(); }
   else if (k === 'dayNote') { clearTimeout(noteTimer); const s = S.day; noteTimer = setTimeout(() => { editDay(s).note = el.value; save(); }, 400); }
   else if (k === 'suppName') { supp(el.dataset.a).name = el.value; save(); }
