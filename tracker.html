@@ -123,14 +123,15 @@ const DARK = '#2A2230', WHITE = '#FFFFFF';
 /* ---------- option lists (agreed together) ---------- */
 const FAMS = [
   { id: 'anger',  name: 'כעס ועצבנות',   c: '#e34948', items: ['עצבנית', 'כועסת', 'מתוסכלת', 'חסרת סבלנות', 'עוקצנית'] },
-  { id: 'stress', name: 'סטרס וחרדה',    c: '#eb6834', items: ['לחוצה', 'חרדה', 'מודאגת', 'מוצפת', 'חסרת מנוחה'] },
+  { id: 'stress', name: 'סטרס וחרדה',    c: '#eb6834', items: ['לחוצה', 'חרדה', 'מודאגת', 'מוצפת', 'חסרת מנוחה', 'שיתוק ניהולי'] },
   { id: 'sad',    name: 'עצב',           c: '#2a78d6', items: ['עצובה', 'בודדה', 'מאוכזבת', 'פגועה', 'רגישה / בוכייה'] },
   { id: 'low',    name: 'דכדוך וריקנות', c: '#6250d6', items: ['מדוכדכת', 'חסרת תקווה', 'ריקה / אדישה', 'חסרת מוטיבציה', 'מותשת רגשית'] },
+  { id: 'self',   name: 'ביקורת עצמית',  c: '#a0522d', items: ['שנאה עצמית', 'אשמה'] },
   { id: 'calm',   name: 'רוגע',          c: '#e87ba4', items: ['רגועה', 'שלווה', 'מסופקת', 'בטוחה', 'אסירת תודה'] },
   { id: 'joy',    name: 'שמחה ואנרגיה',  c: '#eda100', items: ['שמחה', 'אופטימית', 'נלהבת', 'מרוכזת', 'מלאת מוטיבציה', 'גאה'] }
 ];
 // legend / chart order chosen so neighbouring colours stay distinguishable (validated)
-const FAM_LEGEND = ['anger', 'sad', 'stress', 'low', 'joy', 'calm'];
+const FAM_LEGEND = ['anger', 'sad', 'stress', 'low', 'joy', 'calm', 'self'];
 const famById = id => FAMS.find(f => f.id === id);
 const famOfWord = w => FAMS.find(f => f.items.includes(w));
 
@@ -1089,7 +1090,7 @@ function suggestFor(entry) {
   else if (entry.kind === 'mood') {
     const fams = new Set((entry.emos || []).map(w => (famOfWord(w) || {}).id));
     if (fams.has('stress')) focus = (entry.emos || []).includes('חרדה') ? 'חרדה' : 'סטרס';
-    else if (fams.has('sad') || fams.has('low')) focus = 'עצב / דכדוך';
+    else if (fams.has('sad') || fams.has('low') || fams.has('self')) focus = 'עצב / דכדוך';
     else if (fams.has('anger')) focus = 'סטרס';
     else if (entry.score && entry.score <= 2) focus = 'כללי';
   }
@@ -1280,7 +1281,7 @@ function foodInsights(days) {
     ['belly', 'תסמיני בטן', s => { const m = metrics(s); return m.hasEntries ? (m.belly || 0) : null; }, 'עוצמה ממוצעת', 4],
     ['pain', 'כאב', s => { const m = metrics(s); return m.hasEntries ? (m.pain || 0) : null; }, 'כאב מקסימלי ממוצע', 10],
     ['mood', 'מצב רוח', s => metrics(s).mood, 'ציון ממוצע', 5],
-    ['lowsad', 'ימי עצב או דכדוך', s => { const m = metrics(s); return m.moodSeq.length ? ((m.famW.low || m.famW.sad) ? 1 : 0) : null; }, 'שיעור הימים', 1],
+    ['lowsad', 'ימי עצב או דכדוך', s => { const m = metrics(s); return m.moodSeq.length ? ((m.famW.low || m.famW.sad || m.famW.self) ? 1 : 0) : null; }, 'שיעור הימים', 1],
     ['stool', 'יציאות לא תקינות', s => { const m = metrics(s); return m.hasEntries ? (m.stool.some(b => b <= 2 || b >= 6) ? 1 : 0) : null; }, 'שיעור הימים', 1]
   ];
   const groups = FOOD_CATS.map(c => [c[0], c[1], s => metrics(s).cats.has(c[0])])
