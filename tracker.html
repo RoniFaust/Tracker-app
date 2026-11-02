@@ -1029,6 +1029,36 @@ function ensureTools() {
 const toolById = id => (DATA.tools || []).find(t => t.id === id);
 function daySessions(s) { return getDay(s).sessions || []; }
 
+
+/* ---------- tool images: kept on this phone in IndexedDB (not in the code, not public) ---------- */
+const IMG = (() => {
+  let dbp = null; const mem = {};
+  const db = () => dbp || (dbp = new Promise((res, rej) => {
+    try { const r = indexedDB.open('tracker-images', 1); r.onupgradeneeded = () => r.result.createObjectStore('img'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch (e) { rej(e); }
+  }));
+  const tx = (mode, fn) => db().then(d => new Promise((res, rej) => { const t = d.transaction('img', mode); const s = t.objectStore('img'); const r = fn(s); t.oncomplete = () => res(r && r.result); t.onerror = () => rej(t.error); }));
+  return {
+    get: id => mem[id] ? Promise.resolve(mem[id]) : tx('readonly', s => s.get(id)).then(v => { if (v) mem[id] = v; return v; }).catch(() => null),
+    put: (id, url) => { mem[id] = url; return tx('readwrite', s => s.put(url, id)); },
+    del: id => { delete mem[id]; return tx('readwrite', s => s.delete(id)).catch(() => {}); },
+    all: () => tx('readonly', s => s.getAllKeys()).then(keys => Promise.all((keys || []).map(k => IMG.get(k).then(v => [k, v])))).then(Object.fromEntries).catch(() => ({}))
+  };
+})();
+// shrink a picked photo so it stays small (longest side 1100px, JPEG)
+function shrinkImage(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = () => { const k = Math.min(1, 1100 / Math.max(im.width, im.height)); const c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.85)); };
+    im.onerror = () => { URL.revokeObjectURL(url); rej(new Error('img')); };
+    im.src = url;
+  });
+}
+// fill every <img data-tool-img="id"> on screen
+function fillImages(root) {
+  (root || document).querySelectorAll('img[data-tool-img]').forEach(el => IMG.get(el.dataset.toolImg).then(u => { if (u) { el.src = u; el.style.display = ''; } }));
+}
+
 /* ---------- goals ---------- */
 function goalText(g) { if (!g) return ''; return g.per === 'day' ? g.n + ' ביום' : g.n + ' בשבוע'; }
 function goalProgress(tool, s) {
@@ -1075,10 +1105,12 @@ function renderTools() {
       ${group('mine', 'התרגולים שלי', DATA.tools.filter(x => !x.breath && !x.guide && !x.pose))}
       <button class="btn soft block" style="margin-top:12px" data-act="toolNew">+ הוספת תרגול</button>
     </section>`;
+  fillImages($view);
 }
 function toolRow(x) {
   const meta = [x.type, (x.focus || []).join(', '), x.goal ? 'יעד: ' + goalText(x.goal) : ''].filter(Boolean).join(' · ');
   return `<div class="between" style="padding:10px 0;border-top:1px solid var(--line2)">
+    ${x.hasImg ? `<img data-tool-img="${x.id}" alt="" style="display:none;width:56px;height:56px;object-fit:cover;border-radius:10px;flex:0 0 auto">` : ''}
     <button type="button" style="flex:1;min-width:0;text-align:right;background:none;border:none;padding:0" data-act="toolEdit" data-a="${x.id}" aria-label="עריכת ${esc(x.name)}">
       <span style="display:block;font-weight:700">${esc(x.name)}${x.pose ? ` <span class="xs muted" style="font-weight:600" dir="ltr">${esc(POSES[x.pose].en)}</span>` : ''}${x.url ? ' <span class="xs" style="color:var(--accent)">· וידאו</span>' : ''}</span>${WHEN[x.id] ? `<span style="display:block;font-size:13px;color:var(--ink2);margin:1px 0">${esc(WHEN[x.id])}</span>` : ''}<span class="xs muted">${esc(meta)}</span></button>
     <button class="btn" style="min-height:42px;padding:0 16px;flex:0 0 auto" data-act="toolStart" data-a="${x.id}">התחלה</button></div>`;
@@ -1108,11 +1140,18 @@ function renderToolEditor() {
     <div class="lbl">סוג</div><div class="wrap">${TOOL_TYPES.filter(y => y !== 'נשימה').map(y => chip(y, x.type === y, 'tSet', 'type::' + y)).join('')}</div>
     <label class="lbl" style="display:block" for="tUrl">קישור (YouTube או כל אתר, לא חובה)</label><input id="tUrl" class="input" style="background:#fff" dir="ltr" value="${esc(x.url || '')}" placeholder="https://youtu.be/…" data-input="tUrl">
     <label class="lbl" style="display:block" for="tText">הוראות / תזכורת לעצמי (לא חובה)</label><textarea id="tText" class="input" style="background:#fff" rows="3" placeholder="לדוגמה: נקודות הטאפינג לפי הסדר…" data-input="tText">${esc(x.text || '')}</textarea>`}
+    ${x.breath ? '' : `<div class="lbl">תמונה להמחשה (לא חובה)</div>
+    ${x._img ? `<img src="${x._img}" alt="" style="width:100%;max-height:260px;object-fit:contain;border-radius:12px;background:#fff;border:1px solid var(--line)">` : x.hasImg && !x._imgDel ? `<img data-tool-img="${x.id}" alt="" style="display:none;width:100%;max-height:260px;object-fit:contain;border-radius:12px;background:#fff;border:1px solid var(--line)">` : ''}
+    <div class="row" style="margin-top:8px">
+      <label class="btn ghost" style="flex:1;display:flex;align-items:center;justify-content:center;min-height:44px">${x._img || (x.hasImg && !x._imgDel) ? 'החלפת תמונה' : 'בחירת תמונה מהגלריה'}<input type="file" accept="image/*" style="display:none" data-change="toolImg"></label>
+      ${x._img || (x.hasImg && !x._imgDel) ? `<button class="btn ghost" style="color:#A3324A;min-height:44px" data-act="tImgDel">הסרה</button>` : ''}</div>
+    <div class="xs muted" style="margin-top:4px">למשל צילום מסך של איור התנוחה. התמונה נשמרת רק בטלפון שלך.</div>`}
     <div class="lbl">מתאים ל…</div><div class="wrap">${FOCUS.map(f => chip(f, (x.focus || []).includes(f), 'tFocus', f)).join('')}</div>
     <div class="lbl">יעד</div><div class="wrap">${[['none', 'בלי יעד'], ['day', 'ביום'], ['week', 'בשבוע']].map(p => chip(p[1], g.per === p[0], 'tGoalPer', p[0])).join('')}</div>
     ${g.per !== 'none' ? `<div class="lbl">כמה פעמים ${g.per === 'day' ? 'ביום' : 'בשבוע'}?</div><div class="scale" style="grid-template-columns:repeat(7,minmax(0,1fr))">${[1, 2, 3, 4, 5, 6, 7].map(n => `<button aria-pressed="${g.n === n}" style="background:#fff;border:1px solid var(--chipline)" data-act="tGoalN" data-a="${n}">${n}</button>`).join('')}</div>` : ''}
     <div class="row" style="margin-top:16px"><button class="btn" style="flex:1" data-act="toolSave">שמירה</button>
       ${!x._new && !x.builtin ? `<button class="btn ghost" style="color:#A3324A" data-act="toolDel">מחיקה</button>` : ''}</div>`;
+  fillImages($panel);
 }
 
 /* ---------- session flow (sheet): before → run → after ---------- */
@@ -1163,9 +1202,11 @@ function renderSession() {
         <div class="xs muted" style="margin-top:6px">הזמן ממשיך להימדד גם כשהתרגול פתוח באפליקציה אחרת. חזרי לכאן כשתסיימי.</div>`;
       if (x.text) body += `<div class="card" style="margin-top:12px;white-space:pre-line;font-size:15px">${esc(x.text)}</div>`;
     }
+    if (x.hasImg) body = `<img data-tool-img="${x.id}" alt="${esc(x.name)}" data-act="imgZoom" style="display:none;width:100%;max-height:44vh;object-fit:contain;border-radius:14px;background:#fff;border:1px solid var(--line);margin-top:10px;cursor:zoom-in">` + body;
     $panel.innerHTML = `${head}${body}
       <div style="text-align:center;margin-top:10px"><span class="small muted">זמן</span> <b id="sClock" style="font-size:20px;font-variant-numeric:tabular-nums">0:00</b>${x.breath && z.mins ? ` <span class="small muted">/ ${z.mins}:00</span>` : ''}</div>
       ${x.guide && GUIDES[x.guide].steps && !GUIDES[x.guide].auto ? '' : `<button class="btn block" style="margin-top:12px" data-act="sDone">סיימתי</button>`}`;
+    fillImages($panel);
     if (!z.start) runTimers(x); else if (x.guide === 'step' && z.g.running) tickStep();
     return;
   }
@@ -1391,10 +1432,14 @@ Object.assign(ACT_EXTRA, {
     const x = S.toolEd; x.name = (x.name || '').trim();
     if (!x.name) { toast('צריך לתת שם לתרגול'); return; }
     const isNew = x._new; delete x._new;
+    if (x._img) { IMG.put(x.id, x._img); x.hasImg = true; }
+    else if (x._imgDel) { IMG.del(x.id); x.hasImg = false; }
+    delete x._img; delete x._imgDel;
     if (isNew) DATA.tools.push(x); else DATA.tools[DATA.tools.findIndex(y => y.id === x.id)] = x;
     save(); ACT.sheetClose(); render();
   },
-  toolDel: () => { if (!confirm('למחוק את "' + S.toolEd.name + '"? התרגולים שכבר נרשמו יישארו.')) return; DATA.tools = DATA.tools.filter(y => y.id !== S.toolEd.id); save(); ACT.sheetClose(); render(); },
+  tImgDel: () => { S.toolEd._img = null; S.toolEd._imgDel = true; renderToolEditor(); },
+  toolDel: () => { if (!confirm('למחוק את "' + S.toolEd.name + '"? התרגולים שכבר נרשמו יישארו.')) return; IMG.del(S.toolEd.id); DATA.tools = DATA.tools.filter(y => y.id !== S.toolEd.id); save(); ACT.sheetClose(); render(); },
   toolStart: a => startSession(a),
   sFocus: a => { S.sess.focus = a; renderSession(); },
   sNum: a => { const [f, v] = a.split('::'); S.sess[f] = S.sess[f] === Number(v) ? null : Number(v); renderSession(); },
@@ -1696,13 +1741,19 @@ const ACT = {
   cDelete: () => { if (!confirm('למחוק את הרשומה?')) return; const d = editDay(S.day); d.entries = d.entries.filter(x => x.id !== S.comp.id); save(); ACT.cClose(); render(); },
   cClose: () => { if (history.state && history.state.v === 'sheet') history.back(); else closeSheet(); },
   range: a => { S.range = Number(a); render(); },
-  export: () => {
+  export: () => IMG.all().then(images => {
     let wl = []; try { wl = JSON.parse(localStorage.getItem(WORKOUT_KEY) || '[]'); } catch (e) {}
-    const out = { app: 'tracker', version: 1, exportedAt: new Date().toISOString(), data: DATA, workoutLog: wl,
+    const out = { app: 'tracker', version: 1, exportedAt: new Date().toISOString(), data: DATA, workoutLog: wl, images,
       legend: { suppTaken: 'supplement value = HH:MM when taken, or true if no time', scales: 'mood score 1-5 (overall mood, optional), energy 1-5 (separate energy entries; older mood entries may also carry energy), pain 0-10, severity קלה<בינונית<חזקה<קשה, bristol 1-7', foodCats: Object.fromEntries(FOOD_CATS) } };
     download('tracker-' + todayS() + '.json', JSON.stringify(out, null, 1));
     try { localStorage.setItem('tracker.lastBackup', todayS()); } catch (e) {}
     if (S.tab === 'settings' && !S.day) setTimeout(render, 300);
+  }),
+  imgZoom: () => {
+    const src = (document.querySelector('#sheetPanel img[data-act="imgZoom"]') || {}).src; if (!src) return;
+    const o = document.createElement('div'); o.style.cssText = 'position:fixed;inset:0;z-index:80;background:rgba(20,16,24,.92);display:flex;align-items:center;justify-content:center;padding:12px';
+    o.innerHTML = '<img alt="" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:8px">'; o.firstChild.src = src;
+    o.addEventListener('click', () => o.remove()); document.body.appendChild(o);
   },
   suppOpen: a => { S.suppOpen = S.suppOpen === a ? null : a; render(); },
   suppTime: a => { const [id, v] = split2(a); toggleIn(supp(id).times, v); supp(id).times.sort((x, y) => SUPP_TIMES.indexOf(x) - SUPP_TIMES.indexOf(y)); save(); render(); },
@@ -1752,6 +1803,11 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.dataset && e.target.dataset.enter) { e.preventDefault(); ACT[e.target.dataset.enter](); }
 });
 document.addEventListener('change', e => {
+  if (e.target.dataset && e.target.dataset.change === 'toolImg') {
+    const f = e.target.files && e.target.files[0]; if (!f || !S.toolEd) return;
+    shrinkImage(f).then(u => { S.toolEd._img = u; S.toolEd._imgDel = false; renderToolEditor(); }).catch(() => toast('לא הצלחתי לפתוח את התמונה'));
+    return;
+  }
   if (e.target.dataset && e.target.dataset.change === 'import') {
     const file = e.target.files && e.target.files[0]; if (!file) return;
     const r = new FileReader();
@@ -1760,7 +1816,8 @@ document.addEventListener('change', e => {
         const obj = JSON.parse(r.result);
         if (!obj || obj.app !== 'tracker' || !obj.data || !obj.data.days) throw new Error('bad');
         if (!confirm('לשחזר מהגיבוי? הנתונים הנוכחיים ביומן יוחלפו בנתוני הגיבוי. (יומן האימונים לא ישתנה.)')) return;
-        localStorage.setItem(KEY, JSON.stringify(obj.data)); load(); invalidate(); render(); toast('השחזור הצליח');
+        localStorage.setItem(KEY, JSON.stringify(obj.data)); load(); invalidate();
+        Promise.all(Object.entries(obj.images || {}).map(([k, v]) => v ? IMG.put(k, v) : null)).then(() => { render(); toast('השחזור הצליח'); });
       } catch (err) { alert('הקובץ לא נראה כמו גיבוי של היומן'); }
       e.target.value = '';
     };
