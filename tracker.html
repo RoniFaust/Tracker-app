@@ -139,8 +139,8 @@ const MOOD_LABELS = ['קשה', 'לא משהו', 'בסדר', 'טוב', 'מצוי�
 const MOOD_DIV = ['#A8466C', '#D9A0B4', '#EDE3D2', '#A9C2E0', '#3F6FA8'];
 const INTENSITY = ['קלה', 'בינונית', 'חזקה'];
 
-const PAIN_AREAS = ['אגן', 'בטן תחתונה', 'צד ימין', 'צד שמאל', 'גב תחתון', 'ירכיים ורגליים', 'פי הטבעת', 'ראש', 'מפרקים', 'כתפיים וצוואר'];
-const PAIN_TYPES = ['התכווצויות', 'עמום', 'חד', 'דוקר', 'צורב', 'לוחץ', 'מקרין', 'פועם'];
+const PAIN_AREAS = ['אגן', 'בטן תחתונה', 'צד ימין', 'צד שמאל', 'גב תחתון', 'גב עליון', 'ירכיים ורגליים', 'זרועות', 'פי הטבעת', 'ראש', 'מפרקים', 'כתפיים וצוואר', 'כל הגוף'];
+const PAIN_TYPES = ['התכווצויות', 'שריר תפוס', 'דואב', 'עמום', 'חד', 'דוקר', 'צורב', 'לוחץ', 'מקרין', 'פועם'];
 const PAIN_WHEN = ['מחזור', 'יציאות', 'הטלת שתן', 'אחרי אוכל', 'תנועה או אימון', 'יחסי מין', 'ישיבה ממושכת'];
 const PAIN_HELP = ['משכך כאבים', 'חימום', 'מנוחה', 'מתיחות', 'מקלחת חמה', 'שום דבר'];
 const PAIN_IMPACT = ['לא הפריע', 'הפריע קצת', 'נאלצתי לעצור את מה שעשיתי', 'כאב משתק – התקפלות, בכי, צעקות'];
@@ -153,8 +153,10 @@ const SEVERITY = ['קלה', 'בינונית', 'חזקה', 'קשה'];
 const GEN_GROUPS = [
   ['ראש וקוגניציה', ['כאב ראש', 'מיגרנה', 'ערפל מוחי', 'סחרחורת']],
   ['אנרגיה ושינה', ['עייפות קיצונית', 'נדודי שינה']],
-  ['חום וגוף', ['חום', 'צמרמורות', 'גלי חום', 'דופק מהיר']],
-  ['הורמונלי ועור', ['רגישות בשדיים', 'אקנה', 'פריחה', 'גירוד']],
+  ['חום וגוף', ['חום', 'צמרמורות', 'גלי חום', 'דופק מהיר', 'כאבי שרירים כלליים']],
+  ['צינון ונשימה', ['צינון', 'נזלת', 'גודש באף', 'כאב גרון', 'שיעול']],
+  ['הורמונלי', ['רגישות בשדיים', 'אקנה']],
+  ['עור ואלרגיה', ['גירוד', 'פריחה', 'סרפדת (חבורות מגרדות)', 'תגובה חזקה לעקיצה', 'עקיצה שלא עוברת', 'עיניים מגרדות / דומעות', 'התעטשויות']],
   ['תיאבון, שתן וריח', ['תיאבון מוגבר', 'תיאבון ירוד', 'תכיפות במתן שתן', 'רגישות לריחות']]
 ];
 
@@ -166,6 +168,7 @@ const CYCLE_EXTRAS = ['קרישי דם', 'כתמים בין מחזורים'];
 const SLEEP_H = ['פחות מ-5', '5–6', '6–7', '7–8', '8+'];
 const SLEEP_H_NUM = [4.5, 5.5, 6.5, 7.5, 8.5];
 const SLEEP_Q = ['גרועה', 'בינונית', 'טובה', 'מצוינת'];
+const DREAMS = ['לא זוכרת', 'חלומות', 'חלומות רעים'];
 
 const SLOTS = ['כל היום', 'בוקר', 'צהריים', 'ערב', 'ביניים / נשנוש', 'לילה'];
 const PREP = ['ביתי', 'קנוי', 'בחוץ / מסעדה'];
@@ -233,7 +236,7 @@ function save() {
   catch (e) { toast('השמירה נכשלה — כדאי לשמור גיבוי מההגדרות'); }
   invalidate();
 }
-function emptyDay() { return { bleed: '', extras: [], sleepH: '', sleepQ: '', entries: [], foods: [], craves: [], feel: 0, supp: {}, note: '', sessions: [] }; }
+function emptyDay() { return { bleed: '', extras: [], sleepH: '', sleepQ: '', dream: '', entries: [], foods: [], craves: [], feel: 0, supp: {}, note: '', sessions: [] }; }
 function getDay(s) { return DATA.days[s] || emptyDay(); }
 function editDay(s) { if (!DATA.days[s]) DATA.days[s] = emptyDay(); return DATA.days[s]; }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -596,8 +599,8 @@ function renderDay() {
     ${suggestCard()}
     ${section('cycle', 'מחזור', '#B85C7E', isBleed(d.bleed) || d.bleed === 'הכתמה' ? 'דימום: ' + d.bleed + (d.extras.length ? ' · ' + d.extras.join(', ') : '') : d.bleed === 'אין' ? 'אין דימום' : 'לא מולא',
       () => `<div class="lbl">דימום</div>${chips(BLEED, x => (d.bleed || '') === x, 'bleed')}<div class="lbl">נוסף (לא חובה)</div>${chips(CYCLE_EXTRAS, x => d.extras.includes(x), 'extra')}`)}
-    ${section('sleep', 'שינה', '#3F6FA8', d.sleepH ? d.sleepH + ' שעות' + (d.sleepQ ? ' · ' + d.sleepQ : '') : 'לא מולא',
-      () => `<div class="lbl">כמה שעות? (הלילה שעבר)</div>${chips(SLEEP_H, x => d.sleepH === x, 'sleepH')}<div class="lbl">איכות</div>${chips(SLEEP_Q, x => d.sleepQ === x, 'sleepQ')}`)}
+    ${section('sleep', 'שינה', '#3F6FA8', [d.sleepH ? d.sleepH + ' שעות' : '', d.sleepQ, d.dream && d.dream !== 'לא זוכרת' ? d.dream : ''].filter(Boolean).join(' · ') || 'לא מולא',
+      () => `<div class="lbl">כמה שעות? (הלילה שעבר)</div>${chips(SLEEP_H, x => d.sleepH === x, 'sleepH')}<div class="lbl">איכות</div>${chips(SLEEP_Q, x => d.sleepQ === x, 'sleepQ')}<div class="lbl">חלומות</div>${chips(DREAMS, x => d.dream === x, 'dream')}`)}
     ${entrySecs}
     ${section('food', 'אוכל', '#C0603A', foodsN ? (foodsN === 1 ? 'פריט אחד' : foodsN + ' פריטים') + (d.feel ? ' · תחושה ' + d.feel + '/5' : '') + (d.craves.length ? ' · ' + d.craves.join(', ') : '') : 'לא מולא', () => foodCard(s))}
     ${section('supp', 'תוספים', '#8F6B1E', st.due ? st.done + ' מתוך ' + st.due + ' מנות' : 'אין מתוכננים היום', () => suppCard(s))}
@@ -1077,6 +1080,31 @@ function ytId(url) {
   return m ? m[1] : null;
 }
 
+// vertical when it's a Shorts link, or when the user chose "לאורך"
+function isVertical(x) { return x.orient ? x.orient === 'v' : /youtube\.com\/shorts\//.test(x.url || ''); }
+function videoEmbed(x, loop) {
+  const yid = ytId(x.url); if (!yid) return '';
+  const v = isVertical(x);
+  const box = v ? 'position:relative;width:min(100%, calc(50vh * 9 / 16));aspect-ratio:9/16;margin:10px auto 0'
+                : 'position:relative;width:100%;aspect-ratio:16/9;margin-top:10px';
+  const q = 'rel=0&playsinline=1' + (loop ? '&loop=1&playlist=' + yid : '');
+  return `<div style="${box};border-radius:14px;overflow:hidden;background:#000">
+      <iframe src="https://www.youtube-nocookie.com/embed/${yid}?${q}" title="${esc(x.name)}" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>
+    <div style="text-align:${v ? 'center' : 'right'}"><a class="small" href="${esc(x.url)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;font-weight:700">לא מתנגן כאן? פתיחה ב-YouTube</a></div>`;
+}
+// list thumbnail: own picture first, otherwise the video's YouTube thumbnail
+function orientChips(x) {
+  if (!ytId(x.url)) return '';
+  const v = isVertical(x);
+  return `<div class="lbl">צורת הסרטון</div><div class="wrap">${chip('לרוחב', !v, 'tOrient', 'h')}${chip('לאורך (Shorts)', v, 'tOrient', 'v')}</div>`;
+}
+function thumbHtml(x) {
+  const st = 'width:56px;height:56px;object-fit:cover;border-radius:10px;flex:0 0 auto';
+  if (x.hasImg) return `<img data-tool-img="${x.id}" alt="" style="display:none;${st}">`;
+  const yid = ytId(x.url);
+  return yid ? `<img src="https://i.ytimg.com/vi/${yid}/hqdefault.jpg" alt="" loading="lazy" style="${st};background:#000" onerror="this.remove()">` : '';
+}
+
 /* ---------- toolbox screen ---------- */
 function renderTools() {
   ensureTools();
@@ -1110,7 +1138,7 @@ function renderTools() {
 function toolRow(x) {
   const meta = [x.type, (x.focus || []).join(', '), x.goal ? 'יעד: ' + goalText(x.goal) : ''].filter(Boolean).join(' · ');
   return `<div class="between" style="padding:10px 0;border-top:1px solid var(--line2)">
-    ${x.hasImg ? `<img data-tool-img="${x.id}" alt="" style="display:none;width:56px;height:56px;object-fit:cover;border-radius:10px;flex:0 0 auto">` : ''}
+    ${thumbHtml(x)}
     <button type="button" style="flex:1;min-width:0;text-align:right;background:none;border:none;padding:0" data-act="toolEdit" data-a="${x.id}" aria-label="עריכת ${esc(x.name)}">
       <span style="display:block;font-weight:700">${esc(x.name)}${x.pose ? ` <span class="xs muted" style="font-weight:600" dir="ltr">${esc(POSES[x.pose].en)}</span>` : ''}${x.url ? ' <span class="xs" style="color:var(--accent)">· וידאו</span>' : ''}</span>${WHEN[x.id] ? `<span style="display:block;font-size:13px;color:var(--ink2);margin:1px 0">${esc(WHEN[x.id])}</span>` : ''}<span class="xs muted">${esc(meta)}</span></button>
     <button class="btn" style="min-height:42px;padding:0 16px;flex:0 0 auto" data-act="toolStart" data-a="${x.id}">התחלה</button></div>`;
@@ -1135,10 +1163,10 @@ function renderToolEditor() {
     <div class="between"><h2 style="margin:0">${x._new ? 'תרגול חדש' : 'עריכת תרגול'}</h2><button class="iconbtn" aria-label="סגירה" data-act="sheetClose">${ICON.x}</button></div>
     ${x.pose ? `<div class="small muted" style="margin:6px 0 4px" dir="auto">${esc(POSES[x.pose].en)} · ${esc(POSES[x.pose].when)}</div>
     <label class="lbl" style="display:block" for="tUrl">סרטון YouTube שמדגים (לא חובה)</label><input id="tUrl" class="input" style="background:#fff" dir="ltr" value="${esc(x.url || '')}" placeholder="https://youtu.be/…" data-input="tUrl">
-    <div class="xs muted" style="margin-top:4px">הסרטון יופיע מעל ההוראות בזמן התרגול.</div>` : x.breath || x.guide ? `<div class="small muted" style="margin:6px 0 4px">${esc(x.breath ? BREATH[x.breath].desc : GUIDES[x.guide].desc)}</div>` : `
+    <div class="xs muted" style="margin-top:4px">הסרטון יופיע מעל ההוראות בזמן התרגול, ויתנגן בלולאה.</div>${orientChips(x)}` : x.breath || x.guide ? `<div class="small muted" style="margin:6px 0 4px">${esc(x.breath ? BREATH[x.breath].desc : GUIDES[x.guide].desc)}</div>` : `
     <label class="lbl" style="display:block" for="tName">שם</label><input id="tName" class="input" style="background:#fff" value="${esc(x.name)}" placeholder="לדוגמה: מדיטציה לכאב – 10 דק׳" data-input="tName">
     <div class="lbl">סוג</div><div class="wrap">${TOOL_TYPES.filter(y => y !== 'נשימה').map(y => chip(y, x.type === y, 'tSet', 'type::' + y)).join('')}</div>
-    <label class="lbl" style="display:block" for="tUrl">קישור (YouTube או כל אתר, לא חובה)</label><input id="tUrl" class="input" style="background:#fff" dir="ltr" value="${esc(x.url || '')}" placeholder="https://youtu.be/…" data-input="tUrl">
+    <label class="lbl" style="display:block" for="tUrl">קישור (YouTube או כל אתר, לא חובה)</label><input id="tUrl" class="input" style="background:#fff" dir="ltr" value="${esc(x.url || '')}" placeholder="https://youtu.be/…" data-input="tUrl">${orientChips(x)}
     <label class="lbl" style="display:block" for="tText">הוראות / תזכורת לעצמי (לא חובה)</label><textarea id="tText" class="input" style="background:#fff" rows="3" placeholder="לדוגמה: נקודות הטאפינג לפי הסדר…" data-input="tText">${esc(x.text || '')}</textarea>`}
     ${x.breath ? '' : `<div class="lbl">תמונה להמחשה (לא חובה)</div>
     ${x._img ? `<img src="${x._img}" alt="" style="width:100%;max-height:260px;object-fit:contain;border-radius:12px;background:#fff;border:1px solid var(--line)">` : x.hasImg && !x._imgDel ? `<img data-tool-img="${x.id}" alt="" style="display:none;width:100%;max-height:260px;object-fit:contain;border-radius:12px;background:#fff;border:1px solid var(--line)">` : ''}
@@ -1195,9 +1223,7 @@ function renderSession() {
         <div class="small muted" style="margin-top:10px">${esc(BREATH[x.breath].desc)}</div></div>`;
     } else {
       const yid = ytId(x.url);
-      if (yid) body += `<div style="position:relative;width:100%;padding-top:56.25%;border-radius:14px;overflow:hidden;background:#000;margin-top:10px">
-          <iframe src="https://www.youtube-nocookie.com/embed/${yid}?rel=0&playsinline=1" title="${esc(x.name)}" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>
-        <a class="small" href="${esc(x.url)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;font-weight:700">לא מתנגן כאן? פתיחה ב-YouTube</a>`;
+      if (yid) body += videoEmbed(x, false);
       else if (x.url) body += `<a class="btn block" style="display:flex;align-items:center;justify-content:center;margin-top:10px;text-decoration:none" href="${esc(x.url)}" target="_blank" rel="noopener">פתיחת התרגול</a>
         <div class="xs muted" style="margin-top:6px">הזמן ממשיך להימדד גם כשהתרגול פתוח באפליקציה אחרת. חזרי לכאן כשתסיימי.</div>`;
       if (x.text) body += `<div class="card" style="margin-top:12px;white-space:pre-line;font-size:15px">${esc(x.text)}</div>`;
@@ -1380,9 +1406,7 @@ function tickStep() {
 
 function poseBody(x, z) {
   const P = POSES[x.pose], yid = ytId(x.url);
-  return `${yid ? `<div style="position:relative;width:100%;padding-top:56.25%;border-radius:14px;overflow:hidden;background:#000;margin-top:10px">
-      <iframe src="https://www.youtube-nocookie.com/embed/${yid}?rel=0&playsinline=1" title="${esc(x.name)}" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>
-      <a class="small" href="${esc(x.url)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;font-weight:700">לא מתנגן כאן? פתיחה ב-YouTube</a>` : ''}
+  return `${yid ? videoEmbed(x, true) : ''}
     <div class="card" style="margin-top:10px;text-align:center;padding:16px">
       <div id="pSide" class="small" style="font-weight:800;color:var(--accent)">${P.sides ? 'צד ראשון' : 'להחזיק'}</div>
       <div id="pLeft" style="font-size:40px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums">${fmtClock(z.mins * 60)}</div>
@@ -1438,6 +1462,7 @@ Object.assign(ACT_EXTRA, {
     if (isNew) DATA.tools.push(x); else DATA.tools[DATA.tools.findIndex(y => y.id === x.id)] = x;
     save(); ACT.sheetClose(); render();
   },
+  tOrient: a => { S.toolEd.orient = a; renderToolEditor(); },
   tImgDel: () => { S.toolEd._img = null; S.toolEd._imgDel = true; renderToolEditor(); },
   toolDel: () => { if (!confirm('למחוק את "' + S.toolEd.name + '"? התרגולים שכבר נרשמו יישארו.')) return; IMG.del(S.toolEd.id); DATA.tools = DATA.tools.filter(y => y.id !== S.toolEd.id); save(); ACT.sheetClose(); render(); },
   toolStart: a => startSession(a),
@@ -1584,6 +1609,7 @@ function foodInsights(days) {
     ['pain', 'כאב', s => { const m = metrics(s); return m.hasEntries ? (m.pain || 0) : null; }, 'כאב מקסימלי ממוצע', 10],
     ['mood', 'מצב רוח', s => metrics(s).mood, 'ציון ממוצע', 5],
     ['lowsad', 'ימי עצב או דכדוך', s => { const m = metrics(s); return m.moodSeq.length ? ((m.famW.low || m.famW.sad || m.famW.self) ? 1 : 0) : null; }, 'שיעור הימים', 1],
+    ['baddream', 'חלומות רעים', s => { const d = getDay(s); return d.dream ? (d.dream === 'חלומות רעים' ? 1 : 0) : null; }, 'שיעור הימים', 1],
     ['stool', 'יציאות לא תקינות', s => { const m = metrics(s); return m.hasEntries ? (m.stool.some(b => b <= 2 || b >= 6) ? 1 : 0) : null; }, 'שיעור הימים', 1]
   ];
   const groups = FOOD_CATS.map(c => [c[0], c[1], s => metrics(s).cats.has(c[0])])
@@ -1699,6 +1725,7 @@ const ACT = {
   extra: a => { toggleIn(editDay(S.day).extras, a); save(); render(); },
   sleepH: a => { const d = editDay(S.day); d.sleepH = d.sleepH === a ? '' : a; save(); render(); },
   sleepQ: a => { const d = editDay(S.day); d.sleepQ = d.sleepQ === a ? '' : a; save(); render(); },
+  dream: a => { const d = editDay(S.day); d.dream = d.dream === a ? '' : a; save(); render(); },
   // first tap: mark as taken now (today) or open the time editor (another day); tap a taken one: edit time / undo
   supp: a => {
     const d = editDay(S.day);
@@ -1803,6 +1830,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.dataset && e.target.dataset.enter) { e.preventDefault(); ACT[e.target.dataset.enter](); }
 });
 document.addEventListener('change', e => {
+  if (e.target.id === 'tUrl' && S.toolEd) { renderToolEditor(); return; }
   if (e.target.dataset && e.target.dataset.change === 'toolImg') {
     const f = e.target.files && e.target.files[0]; if (!f || !S.toolEd) return;
     shrinkImage(f).then(u => { S.toolEd._img = u; S.toolEd._imgDel = false; renderToolEditor(); }).catch(() => toast('לא הצלחתי לפתוח את התמונה'));
