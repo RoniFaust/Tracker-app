@@ -109,7 +109,8 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
-const APP_VERSION = '6.11';
+const APP_VERSION = '6.11ג';
+const isHM = v => typeof v === 'string' && /^\d\d:\d\d$/.test(v);
 /* =====================================================================
    יומן בריאות — core: constants, storage, dates, cycle, daily metrics
    All data lives in localStorage under keys prefixed "tracker." so it never
@@ -140,13 +141,17 @@ const MOOD_LABELS = ['קשה', 'לא משהו', 'בסדר', 'טוב', 'מצוי�
 const MOOD_DIV = ['#A8466C', '#D9A0B4', '#EDE3D2', '#A9C2E0', '#3F6FA8'];
 const INTENSITY = ['קלה', 'בינונית', 'חזקה'];
 
-const PAIN_AREAS = ['אגן', 'בטן תחתונה', 'צד ימין', 'צד שמאל', 'גב תחתון', 'גב עליון', 'ירכיים ורגליים', 'זרועות', 'פי הטבעת', 'ראש', 'מפרקים', 'כתפיים וצוואר', 'כל הגוף'];
+const PAIN_AREAS = ['אגן', 'בטן תחתונה', 'בטן עליונה', 'מפשעה', 'גב תחתון', 'גב עליון', 'ישבן', 'פי הטבעת', 'שלפוחית / מעל עצם החיק',
+  'ירכיים', 'ברכיים', 'שוקיים', 'כפות רגליים', 'זרועות', 'ידיים ואצבעות', 'כתפיים וצוואר', 'חזה', 'ראש', 'לסת', 'מפרקים', 'כל הגוף'];
+const PAIN_SIDES = ['ימין', 'שמאל', 'שני הצדדים', 'מרכז'];
 const PAIN_TYPES = ['התכווצויות', 'שריר תפוס', 'דואב', 'עמום', 'חד', 'דוקר', 'צורב', 'לוחץ', 'מקרין', 'פועם'];
 const PAIN_WHEN = ['מחזור', 'יציאות', 'הטלת שתן', 'אחרי אוכל', 'תנועה או אימון', 'יחסי מין', 'ישיבה ממושכת'];
 const PAIN_HELP = ['משכך כאבים', 'חימום', 'מנוחה', 'מתיחות', 'מקלחת חמה', 'שום דבר'];
 const PAIN_IMPACT = ['לא הפריע', 'הפריע קצת', 'נאלצתי לעצור את מה שעשיתי', 'כאב משתק – התקפלות, בכי, צעקות'];
 
-const BELLY_SYMS = ['נפיחות', 'בטן קשה למגע', 'גזים', 'כאב בטן', 'התכווצויות בטן', 'עוויתות', 'דקירות', 'צרבת', 'בחילה', 'תחושת מלאות מהירה', 'דחיפות', 'תחושת ריקון חלקי'];
+const BELLY_SYMS = ['נפיחות', 'בטן קשה למגע', 'גזים', 'כאב בטן', 'התכווצויות בטן', 'עוויתות', 'דקירות', 'צרבת', 'בחילה', 'תחושת מלאות מהירה'];
+const STOOL_SYMS = ['דחיפות', 'תחושת ריקון חלקי', 'כאב ביציאה', 'מאמץ / לחץ', 'ריר', 'דם'];
+const URINE_SYMS = ['תכיפות', 'דחיפות', 'כאב / צריבה', 'תחושת ריקון חלקי', 'דם בשתן'];
 const BELLY_WHEN = ['אחרי אוכל', 'סטרס', 'מחזור', 'קפה', 'ארוחה גדולה', 'ארוחה מאוחרת'];
 const BELLY_HELP = ['חימום', 'תה', 'הליכה', 'מנוחה', 'משכך כאבים או תרופה', 'שום דבר'];
 const SEVERITY = ['קלה', 'בינונית', 'חזקה', 'קשה'];
@@ -156,9 +161,9 @@ const GEN_GROUPS = [
   ['אנרגיה ושינה', ['עייפות קיצונית', 'נדודי שינה']],
   ['חום וגוף', ['חום', 'צמרמורות', 'גלי חום', 'דופק מהיר', 'כאבי שרירים כלליים']],
   ['צינון ונשימה', ['צינון', 'נזלת', 'גודש באף', 'כאב גרון', 'שיעול']],
-  ['הורמונלי', ['רגישות בשדיים', 'אקנה']],
+  ['הורמונלי', ['רגישות בשדיים', 'אקנה', 'רגישות לריחות']],
   ['עור ואלרגיה', ['גירוד', 'פריחה', 'סרפדת (חבורות מגרדות)', 'תגובה חזקה לעקיצה', 'עקיצה שלא עוברת', 'עיניים מגרדות / דומעות', 'התעטשויות']],
-  ['תיאבון, שתן וריח', ['תיאבון מוגבר', 'תיאבון ירוד', 'תכיפות במתן שתן', 'רגישות לריחות']]
+  ['תיאבון', ['תיאבון מוגבר', 'תיאבון ירוד']]
 ];
 
 const BRISTOL = ['גושים קשים ונפרדים', 'נקניק עם גושים', 'נקניק עם סדקים', 'חלקה ורכה', 'חתיכות רכות', 'רכה ודייסתית', 'מימית'];
@@ -256,9 +261,10 @@ function workoutsByDate() {
     const areas = new Set();
     (w.exercises || []).forEach(ex => (ex.areas || []).forEach(a => areas.add(AREA_HE[a] || a)));
     (_workouts[w.date] = _workouts[w.date] || []).push({
-      name: w.name || 'אימון', min: Math.round((w.totalSeconds || 0) / 60), cardio: w.kind === 'cardio', areas: [...areas]
+      name: w.name || 'אימון', min: Math.round((w.totalSeconds || 0) / 60), cardio: w.kind === 'cardio', areas: [...areas], time: w.time || '', end: w.end || ''
     });
   });
+  Object.values(_workouts).forEach(list => list.sort((a, b) => (a.time || '99').localeCompare(b.time || '99')));
   return _workouts;
 }
 function workoutMin(s) { return (workoutsByDate()[s] || []).reduce((a, w) => a + w.min, 0); }
@@ -353,7 +359,7 @@ function metrics(s) {
     pain: maxOf('pain', e => e.pain),
     belly: maxOf('belly', e => SEVERITY.indexOf(e.sev) + 1),
     sym: maxOf('other', e => SEVERITY.indexOf(e.sev) + 1),
-    stool: ents.filter(e => e.kind === 'stool').map(e => e.bristol),
+    stool: ents.filter(e => e.kind === 'stool' && e.what !== 'שתן' && e.bristol).map(e => e.bristol),
     feel: d.feel || null,
     fit: workoutMin(s),
     practice: Math.round((d.sessions || []).reduce((a, z) => a + (z.dur || 0), 0) / 60),
@@ -538,9 +544,9 @@ function selCard(s) {
 /* ---------------- day screen ---------------- */
 const SEC_KINDS = [
   ['mood', 'מצב רוח', '#5B3A7A'], ['energy', 'אנרגיה', '#B07D1A'], ['pain', 'כאב', '#45215A'],
-  ['belly', 'בטן ועיכול', '#A35A2E'], ['stool', 'יציאות', '#7A5A3A'], ['other', 'תסמינים', '#3F6FA8']
+  ['belly', 'בטן ועיכול', '#A35A2E'], ['stool', 'יציאות ושתן', '#7A5A3A'], ['other', 'תסמינים', '#3F6FA8']
 ];
-const KIND_TITLE = { mood: 'מצב רוח', energy: 'אנרגיה', pain: 'כאב', belly: 'בטן ועיכול', stool: 'יציאה', other: 'תסמינים' };
+const KIND_TITLE = { mood: 'מצב רוח', energy: 'אנרגיה', pain: 'כאב', belly: 'בטן ועיכול', stool: 'יציאות ושתן', other: 'תסמינים' };
 const ENERGY_LABELS = ['מותשת', 'עייפה', 'בינונית', 'טובה', 'מלאת אנרגיה'];
 const ENERGY_C = ['#F6EBC8', '#EED89A', '#DDBB5C', '#B8902A', '#8F6B1E'];
 function section(key, title, color, summary, body, addKind) {
@@ -569,7 +575,11 @@ function kindSummary(kind, list) {
   }
   if (kind === 'energy') return n + ' · ממוצע ' + fmt1(avg(list.map(e => e.energy))) + '/5';
   if (kind === 'pain') return n + ' · מקסימום ' + Math.max(...list.map(e => e.pain)) + '/10';
-  if (kind === 'stool') return n + ' · בריסטול ' + list.map(e => e.bristol).join(', ');
+  if (kind === 'stool') {
+    const st = list.filter(e => e.what !== 'שתן'), ur = list.filter(e => e.what === 'שתן');
+    const br = st.map(e => e.bristol).filter(Boolean);
+    return [st.length ? (st.length === 1 ? 'יציאה אחת' : st.length + ' יציאות') + (br.length ? ' (בריסטול ' + br.join(', ') + ')' : '') : '', ur.length ? 'שתן: ' + [...new Set([].concat(...ur.map(e => e.syms || [])))].join(', ') : ''].filter(Boolean).join(' · ');
+  }
   const mx = Math.max(...list.map(e => SEVERITY.indexOf(e.sev)));
   const syms = [...new Set([].concat(...list.map(e => e.syms || [])))];
   return n + ' · ' + SEVERITY[mx] + (syms.length ? ' · ' + syms.slice(0, 3).join(', ') : '');
@@ -600,13 +610,16 @@ function renderDay() {
     ${suggestCard()}
     ${section('cycle', 'מחזור', '#B85C7E', isBleed(d.bleed) || d.bleed === 'הכתמה' || d.bleed === 'דם בניגוב' ? 'דימום: ' + d.bleed + (d.extras.length ? ' · ' + d.extras.join(', ') : '') : d.bleed === 'אין' ? 'אין דימום' : 'לא מולא',
       () => `<div class="lbl">דימום</div>${chips(BLEED, x => (d.bleed || '') === x, 'bleed')}<div class="lbl">נוסף (לא חובה)</div>${chips(CYCLE_EXTRAS, x => d.extras.includes(x), 'extra')}`)}
-    ${section('sleep', 'שינה', '#3F6FA8', [d.sleepH ? d.sleepH + ' שעות' : '', d.sleepQ, d.dream && d.dream !== 'לא זוכרת' ? d.dream : ''].filter(Boolean).join(' · ') || 'לא מולא',
-      () => `<div class="lbl">כמה שעות? (הלילה שעבר)</div>${chips(SLEEP_H, x => d.sleepH === x, 'sleepH')}<div class="lbl">איכות</div>${chips(SLEEP_Q, x => d.sleepQ === x, 'sleepQ')}<div class="lbl">חלומות</div>${chips(DREAMS, x => d.dream === x, 'dream')}`)}
+    ${section('sleep', 'שינה', '#3F6FA8', [d.sleepH ? d.sleepH + ' שעות' : '', d.bedT && d.wakeT ? d.bedT + '–' + d.wakeT : '', d.sleepQ, d.dream && d.dream !== 'לא זוכרת' ? d.dream : ''].filter(Boolean).join(' · ') || 'לא מולא',
+      () => `<div class="lbl">כמה שעות? (הלילה שעבר)</div>${chips(SLEEP_H, x => d.sleepH === x, 'sleepH')}<div class="lbl">איכות</div>${chips(SLEEP_Q, x => d.sleepQ === x, 'sleepQ')}<div class="lbl">חלומות</div>${chips(DREAMS, x => d.dream === x, 'dream')}
+      <div class="lbl">שעות (לא חובה)</div><div class="row" style="gap:10px;flex-wrap:wrap">
+        <label class="small muted" for="bedT">נרדמתי בערך</label><input id="bedT" type="time" class="input" style="width:120px;min-height:40px" value="${esc(d.bedT || '')}" data-input="bedT">
+        <label class="small muted" for="wakeT">קמתי</label><input id="wakeT" type="time" class="input" style="width:120px;min-height:40px" value="${esc(d.wakeT || '')}" data-input="wakeT"></div>`)}
     ${entrySecs}
     ${section('food', 'אוכל', '#C0603A', foodsN ? (foodsN === 1 ? 'פריט אחד' : foodsN + ' פריטים') + (d.feel ? ' · תחושה ' + d.feel + '/5' : '') + (d.craves.length ? ' · ' + d.craves.join(', ') : '') : 'לא מולא', () => foodCard(s))}
     ${section('supp', 'תוספים', '#8F6B1E', st.due ? st.done + ' מתוך ' + st.due + ' מנות' : 'אין מתוכננים היום', () => suppCard(s))}
     ${section('practice', 'תרגולים', '#8B6BA8', sess.length ? sess.length + ' · ' + Math.max(1, Math.round(sess.reduce((a, z) => a + (z.dur || 0), 0) / 60)) + ' דק׳' : 'אין', () => sessionsCard(s))}
-    ${section('fit', 'כושר', '#3F6FA8', ws.length ? ws.map(w => w.name + ' ' + w.min + ' דק׳').join(', ') : 'לא תועד אימון', () => fitCard(s))}
+    ${section('fit', 'כושר', '#3F6FA8', ws.length ? ws.map(w => (w.time ? w.time + ' ' : '') + w.name + ' ' + w.min + ' דק׳').join(', ') : 'לא תועד אימון', () => fitCard(s))}
     ${section('note', 'הערה ליום', '#9A8FA3', d.note ? esc(d.note.slice(0, 60)) : 'אין',
       () => `<textarea id="dayNote" class="input" rows="3" placeholder="משהו שכדאי לזכור על היום הזה…" data-input="dayNote">${esc(d.note)}</textarea>`)}
     <button class="btn block" style="margin-top:16px" data-act="back">סיום</button>`;
@@ -619,12 +632,13 @@ function entrySummary(e) {
     return { title, sub, c: f ? f.c : KIND_C.mood };
   }
   if (e.kind === 'pain') return {
-    title: 'כאב ' + e.pain + '/10' + ((e.areas || []).length ? ' · ' + e.areas.join(', ') : ''),
+    title: 'כאב ' + e.pain + '/10' + ((e.areas || []).length ? ' · ' + e.areas.join(', ') : '') + (e.side ? ' (' + e.side + ')' : ''),
     sub: [(e.types || []).join(', '), e.impact, (e.when || []).length ? 'קשור ל: ' + e.when.join(', ') : '', (e.help || []).length ? 'עזר: ' + e.help.join(', ') : ''].filter(Boolean).join(' · '),
     c: KIND_C.pain
   };
   if (e.kind === 'energy') return { title: 'אנרגיה ' + e.energy + '/5 · ' + ENERGY_LABELS[e.energy - 1], sub: '', c: ENERGY_C[Math.max(0, e.energy - 1)] === '#F6EBC8' ? '#DDBB5C' : ENERGY_C[e.energy - 1] };
-  if (e.kind === 'stool') return { title: 'יציאה · בריסטול ' + e.bristol, sub: BRISTOL[e.bristol - 1], c: BRISTOL_C[e.bristol - 1] };
+  if (e.kind === 'stool' && e.what === 'שתן') return { title: 'שתן', sub: (e.syms || []).join(', '), c: '#C9A227' };
+  if (e.kind === 'stool') return { title: 'יציאה' + (e.bristol ? ' · בריסטול ' + e.bristol : ''), sub: [e.bristol ? BRISTOL[e.bristol - 1] : '', (e.syms || []).join(', ')].filter(Boolean).join(' · '), c: e.bristol ? BRISTOL_C[e.bristol - 1] : KIND_C.stool };
   const syms = (e.syms || []).join(', ');
   return {
     title: (e.kind === 'belly' ? 'בטן ועיכול' : 'תסמינים') + ' · ' + e.sev,
@@ -679,13 +693,16 @@ function foodCard(s) {
   const groups = SLOTS.filter(sl => d.foods.some(f => f.slot === sl)).map(sl => `
     <div style="padding:8px 0;border-bottom:1px solid var(--line2)">
       <div class="small" style="font-weight:700;color:var(--accent);margin-bottom:4px">${sl}</div>
-      <div class="wrap">${d.foods.map((f, i) => f.slot === sl ? `<span class="row" style="gap:2px;background:var(--bg);border-radius:16px;padding:2px 4px 2px 10px;font-size:14px">${esc(f.name)}${f.prep && f.prep !== 'ביתי' ? ` <span class="xs muted">(${esc(f.prep)})</span>` : f.prep ? ' <span class="xs muted">(ביתי)</span>' : ''}<button class="iconbtn" style="width:32px;height:32px;color:var(--muted)" aria-label="הסרת ${esc(f.name)}" data-act="rmFood" data-a="${i}">${ICON.x}</button></span>` : '').join('')}</div>
+      <div class="wrap">${d.foods.map((f, i) => f.slot === sl ? `<span class="row" style="gap:2px;background:var(--bg);border-radius:16px;padding:2px 4px 2px 10px;font-size:14px">${f.t ? `<span class="xs" style="font-weight:700;color:var(--accent)">${esc(f.t)}</span> ` : ''}${esc(f.name)}${f.prep && f.prep !== 'ביתי' ? ` <span class="xs muted">(${esc(f.prep)})</span>` : f.prep ? ' <span class="xs muted">(ביתי)</span>' : ''}<button class="iconbtn" style="width:32px;height:32px;color:var(--muted)" aria-label="הסרת ${esc(f.name)}" data-act="rmFood" data-a="${i}">${ICON.x}</button></span>` : '').join('')}</div>
     </div>`).join('');
   const p = S.pending;
   const recent = recentFoods();
   return `<div>
     <div class="small muted" style="margin-bottom:4px">אפשר לפרט לפי ארוחות, או לרשום הכל בסוף היום</div>
     <div class="lbl">מתי?</div>${chips(SLOTS, x => S.slot === x, 'slot')}
+    <div class="row" style="margin-top:8px;gap:8px"><label class="small muted" for="foodTime">שעה (לא חובה)</label>
+      <input id="foodTime" type="time" class="input" style="width:120px;min-height:40px" value="${esc(S.foodTime || '')}" data-input="foodTime">
+      ${S.day === todayS() ? `<button class="chip" style="min-height:36px" data-act="foodNow">עכשיו</button>` : ''}${S.foodTime ? `<button class="chip" style="min-height:36px" data-act="foodTimeClear">ניקוי</button>` : ''}</div>
     <div class="lbl">הכנה</div>${chips(PREP, x => S.prep === x, 'prep')}
     <label class="lbl" for="foodIn" style="display:block">מה אכלת?</label>
     <div class="row">
@@ -701,7 +718,10 @@ function foodCard(s) {
     </div>` : ''}
     ${recent.length ? `<div class="lbl">הוספה מהירה</div><div class="wrap">${recent.map(n => `<button class="chip dashed" data-act="quickFood" data-a="${esc(n)}">+ ${esc(n)}</button>`).join('')}</div>` : ''}
     ${groups ? `<div style="margin-top:12px;border-top:1px solid var(--line2)">${groups}</div>` : ''}
-    <div class="lbl">חשקים ורתיעות</div>${chips(CRAVES, x => d.craves.includes(x), 'crave')}
+    <div class="lbl">חשקים ורתיעות</div><div class="wrap">${CRAVES.map(x => { const on = d.craves.includes(x), at = (d.craveT || {})[x]; return `<button type="button" class="chip" aria-pressed="${on}" data-act="crave" data-a="${esc(x)}">${esc(x)}${on && isHM(at) ? ` <span style="font-weight:600;opacity:.9">${at}</span>` : ''}</button>`; }).join('')}</div>
+    ${S.craveEdit && d.craves.includes(S.craveEdit) ? `<div class="row" style="flex-wrap:wrap;gap:8px;margin-top:8px"><label class="small muted" for="craveAt">${esc(S.craveEdit)}: מתי?</label>
+      <input id="craveAt" type="time" class="input" style="width:120px;min-height:40px" value="${isHM((d.craveT || {})[S.craveEdit]) ? d.craveT[S.craveEdit] : ''}" data-input="craveAt" data-a="${esc(S.craveEdit)}">
+      <button class="chip" data-act="craveDone">סגירה</button><button class="chip" style="color:#A3324A" data-act="craveOff" data-a="${esc(S.craveEdit)}">ביטול הסימון</button></div>` : ''}
     <div class="lbl">איך הרגשת עם האוכל היום?</div>
     <div class="scale" style="grid-template-columns:repeat(5,minmax(0,1fr))">${[1, 2, 3, 4, 5].map(n => `<button aria-pressed="${d.feel === n}" style="background:${MOOD_DIV[n - 1]};color:${fgFor(MOOD_DIV[n - 1])}" data-act="feel" data-a="${n}" aria-label="תחושה ${n}">${n}</button>`).join('')}</div>
     <div class="between xs muted" style="margin-top:4px"><span>רע</span><span>מצוין</span></div>
@@ -711,7 +731,7 @@ function fitCard(s) {
   const ws = workoutsByDate()[s] || [];
   return `<div><div class="xs" style="font-weight:700;color:#2F5A8F">נשאב אוטומטית מ-Workout Pro</div>
     ${ws.length ? ws.map(w => `<div class="row" style="gap:12px;margin-top:10px"><span style="width:44px;height:44px;border-radius:12px;background:#3F6FA8;color:#fff;display:flex;align-items:center;justify-content:center;flex:0 0 auto">${ICON.dumbbell}</span>
-      <div><div style="font-weight:700">${esc(w.name)} · ${w.min} דק׳</div>${w.areas.length ? `<div class="small" style="color:var(--ink2)">${esc(w.areas.join(', '))}</div>` : ''}</div></div>`).join('')
+      <div><div style="font-weight:700">${esc(w.name)} · ${w.min} דק׳${w.time ? ` <span class="small" style="font-weight:600;color:var(--ink2)">· ${esc(w.time)}${w.end ? '–' + esc(w.end) : ''}</span>` : ''}</div>${w.areas.length ? `<div class="small" style="color:var(--ink2)">${esc(w.areas.join(', '))}</div>` : ''}</div></div>`).join('')
       : '<div class="small" style="color:var(--ink2);margin-top:8px">לא תועד אימון ביום הזה.</div>'}
   </div>`;
 }
@@ -719,7 +739,7 @@ function fitCard(s) {
 /* ---------------- entry composer (bottom sheet) ---------------- */
 function newComp(kind) {
   return { id: null, kind: kind || 'mood', t: nowHM(), emos: [], intensity: 'בינונית', score: null, energy: null,
-    areas: [], pain: 5, types: [], when: [], help: [], impact: 'הפריע קצת', syms: [], sev: 'בינונית', temp: '', bristol: 4, note: '' };
+    areas: [], pain: 5, types: [], when: [], help: [], impact: 'הפריע קצת', syms: [], sev: 'בינונית', temp: '', bristol: null, what: 'יציאה', side: '', note: '' };
 }
 function openSheet() { $sheet.classList.add('open'); document.body.style.overflow = 'hidden'; renderSheet(); }
 function closeSheet() { if (typeof stopTimers === 'function') stopTimers(); $sheet.classList.remove('open'); document.body.style.overflow = ''; S.comp = null; S.sess = null; S.toolEd = null; }
@@ -743,6 +763,7 @@ function renderSheet() {
   } else if (c.kind === 'pain') {
     const pc = v => RAMP.pain.find(r => v <= r[0])[1];
     body = `<div class="lbl">איפה?</div>${tog('areas', PAIN_AREAS)}
+      <div class="lbl">באיזה צד? (לא חובה)</div>${chips(PAIN_SIDES, x => c.side === x, 'cSide')}
       <div class="between lbl"><span>עוצמה</span><b style="color:var(--accent);font-size:15px">${c.pain}/10</b></div>
       <div class="scale" style="grid-template-columns:repeat(11,minmax(0,1fr));gap:3px">${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `<button aria-pressed="${c.pain === n}" style="background:${pc(n)};color:${fgFor(pc(n))};font-size:13px;padding:0;outline-color:#E0A458" data-act="cNum" data-a="pain::${n}" aria-label="עוצמה ${n}">${n}</button>`).join('')}</div>
       <div class="lbl">סוג הכאב</div>${tog('types', PAIN_TYPES)}
@@ -756,8 +777,11 @@ function renderSheet() {
       <div class="lbl">קשור ל… (לא חובה)</div>${tog('when', BELLY_WHEN)}
       <div class="lbl">מה עזר? (לא חובה)</div>${tog('help', BELLY_HELP)}`;
   } else if (c.kind === 'stool') {
-    body = `<div class="lbl">סולם בריסטול — מה הכי מתאים?</div>
-      <div class="bristol" style="display:grid;gap:6px">${BRISTOL.map((b, i) => `<button type="button" aria-pressed="${c.bristol === i + 1}" data-act="cNum" data-a="bristol::${i + 1}"><span class="n" style="background:${BRISTOL_C[i]}">${i + 1}</span>${b}</button>`).join('')}</div>`;
+    const urine = c.what === 'שתן';
+    body = `<div class="lbl">מה רושמים?</div>${chips(['יציאה', 'שתן'], x => (c.what || 'יציאה') === x, 'cWhat')}
+      ${urine ? `<div class="lbl">מה הרגשת?</div>${tog('syms', URINE_SYMS)}` : `<div class="lbl">סולם בריסטול — מה הכי מתאים?</div>
+      <div class="bristol" style="display:grid;gap:6px">${BRISTOL.map((b, i) => `<button type="button" aria-pressed="${c.bristol === i + 1}" data-act="cNum" data-a="bristol::${i + 1}"><span class="n" style="background:${BRISTOL_C[i]}">${i + 1}</span>${b}</button>`).join('')}</div>
+      <div class="lbl">נוסף (לא חובה)</div>${tog('syms', STOOL_SYMS)}`}`;
   } else {
     body = `<div class="lbl">אילו תסמינים?</div>
       ${GEN_GROUPS.map(g => `<div class="fam-title" style="color:var(--ink2)">${g[0]}</div>${tog('syms', g[1])}`).join('')}
@@ -781,8 +805,8 @@ function compToEntry(c) {
   const base = { id: c.id || uid(), t: c.t || nowHM(), kind: c.kind, note: (c.note || '').trim() };
   if (c.kind === 'mood') { const o = Object.assign(base, { emos: c.emos, intensity: c.intensity, score: c.score }); if (c.energy) o.energy = c.energy; return o; }
   if (c.kind === 'energy') return Object.assign(base, { energy: c.energy });
-  if (c.kind === 'pain') return Object.assign(base, { areas: c.areas, pain: c.pain, types: c.types, impact: c.impact, when: c.when, help: c.help });
-  if (c.kind === 'stool') return Object.assign(base, { bristol: c.bristol });
+  if (c.kind === 'pain') return Object.assign(base, { side: c.side || '', areas: c.areas, pain: c.pain, types: c.types, impact: c.impact, when: c.when, help: c.help });
+  if (c.kind === 'stool') return c.what === 'שתן' ? Object.assign(base, { what: 'שתן', syms: c.syms }) : Object.assign(base, { what: 'יציאה', bristol: c.bristol, syms: c.syms });
   if (c.kind === 'belly') return Object.assign(base, { syms: c.syms, sev: c.sev, when: c.when, help: c.help });
   return Object.assign(base, { syms: c.syms, sev: c.sev, temp: c.syms.includes('חום') ? c.temp : '' });
 }
@@ -1703,7 +1727,8 @@ function addFoodName(name) {
   name = (name || '').trim().replace(/\s+/g, ' ');
   if (!name) return;
   const d = editDay(S.day);
-  d.foods.push({ name, slot: S.slot, prep: S.prep });
+  const item = { name, slot: S.slot, prep: S.prep }; if (S.foodTime) item.t = S.foodTime;
+  d.foods.push(item);
   if (!DATA.foodLib[name]) {
     const g = guessFoodCats(name);
     DATA.foodLib[name] = { cats: g.cats, confirmed: false };
@@ -1721,7 +1746,7 @@ const ACT = {
   selDay: a => { if (S.sel === a) return ACT.openDay(a); S.sel = a; render(); },
   openDay: a => { S.openSec = {}; S.day = a; S.sel = a; S.pending = null; history.pushState({ v: 'day' }, ''); render(); window.scrollTo(0, 0); },
   back: () => { if (history.state && history.state.v === 'day') history.back(); else { S.day = null; render(); } },
-  dayNav: a => { S.foodDraft = ''; S.suppEdit = null; S.openSec = {}; S.day = addDays(S.day, Number(a)); S.sel = S.day; S.month = S.day.slice(0, 7); S.pending = null; render(); },
+  dayNav: a => { S.foodDraft = ''; S.foodTime = ''; S.craveEdit = null; S.suppEdit = null; S.openSec = {}; S.day = addDays(S.day, Number(a)); S.sel = S.day; S.month = S.day.slice(0, 7); S.pending = null; render(); },
   bleed: a => { editDay(S.day).bleed = a === 'אין' ? 'אין' : a; save(); render(); },
   extra: a => { toggleIn(editDay(S.day).extras, a); save(); render(); },
   sleepH: a => { const d = editDay(S.day); d.sleepH = d.sleepH === a ? '' : a; save(); render(); },
@@ -1745,11 +1770,24 @@ const ACT = {
   pcat: a => { toggleIn(S.pending.cats, a); render(); },
   confirmFood: () => { DATA.foodLib[S.pending.name] = { cats: S.pending.cats.slice(), confirmed: true }; S.pending = null; save(); render(); toast('נשמר בספריית המאכלים'); },
   skipFood: () => { S.pending = null; render(); },
-  crave: a => { toggleIn(editDay(S.day).craves, a); save(); render(); },
+  // cravings keep the time they were marked; tap a marked one to edit its time or undo
+  crave: a => {
+    const d = editDay(S.day); d.craveT = d.craveT || {};
+    if (d.craves.includes(a)) { S.craveEdit = S.craveEdit === a ? null : a; render(); return; }
+    d.craves.push(a);
+    if (S.day === todayS()) { d.craveT[a] = nowHM(); S.craveEdit = null; } else S.craveEdit = a;
+    save(); render();
+  },
+  craveOff: a => { const d = editDay(S.day); d.craves = d.craves.filter(x => x !== a); if (d.craveT) delete d.craveT[a]; S.craveEdit = null; save(); render(); },
+  craveDone: () => { S.craveEdit = null; render(); },
+  foodNow: () => { S.foodTime = nowHM(); render(); },
+  foodTimeClear: () => { S.foodTime = ''; render(); },
   feel: a => { const d = editDay(S.day); d.feel = d.feel === Number(a) ? 0 : Number(a); save(); render(); },
   sec: a => { S.openSec[a] = !S.openSec[a]; render(); },
   newEntry: a => { S.comp = newComp(a || 'mood'); history.pushState({ v: 'sheet' }, ''); openSheet(); },
   editEntry: a => { const e = getDay(S.day).entries.find(x => x.id === a); if (!e) return; S.comp = Object.assign(newComp(e.kind), JSON.parse(JSON.stringify(e))); history.pushState({ v: 'sheet' }, ''); openSheet(); },
+  cWhat: a => { S.comp.what = a; S.comp.syms = []; renderSheet(); },
+  cSide: a => { S.comp.side = S.comp.side === a ? '' : a; renderSheet(); },
   cKind: a => { S.comp.kind = a; S.comp.syms = []; S.comp.when = []; S.comp.help = []; renderSheet(); },
   cToggle: a => { const [f, v] = split2(a); toggleIn(S.comp[f], v); renderSheet(); },
   cSet: a => { const [f, v] = split2(a); S.comp[f] = v; renderSheet(); },
@@ -1758,6 +1796,8 @@ const ACT = {
     const c = S.comp;
     if ((c.kind === 'belly' || c.kind === 'other') && !c.syms.length) { toast('בחרי לפחות תסמין אחד'); return; }
     if (c.kind === 'energy' && !c.energy) { toast('בחרי רמת אנרגיה'); return; }
+    if (c.kind === 'stool' && c.what !== 'שתן' && !c.bristol && !c.syms.length) { toast('בחרי סוג בסולם בריסטול'); return; }
+    if (c.kind === 'stool' && c.what === 'שתן' && !c.syms.length) { toast('בחרי מה הרגשת'); return; }
     if (c.kind === 'mood' && !c.emos.length && !c.score) { toast('בחרי רגש או מצב רוח כללי'); return; }
     S.openSec[c.kind] = true;
     const d = editDay(S.day); const e = compToEntry(c);
@@ -1814,6 +1854,10 @@ document.addEventListener('input', e => {
   else if (k === 'cNote') S.comp.note = el.value;
   else if (k === 'cTemp') S.comp.temp = el.value;
   else if (k === 'foodDraft') S.foodDraft = el.value;
+  else if (k === 'foodTime') S.foodTime = el.value;
+  else if (k === 'craveAt') { const d = editDay(S.day); d.craveT = d.craveT || {}; d.craveT[el.dataset.a] = el.value || true; save(); }
+  else if (k === 'bedT') { editDay(S.day).bedT = el.value; save(); }
+  else if (k === 'wakeT') { editDay(S.day).wakeT = el.value; save(); }
   else if (k === 'tName') S.toolEd.name = el.value;
   else if (k === 'tUrl') S.toolEd.url = el.value.trim();
   else if (k === 'tText') S.toolEd.text = el.value;
