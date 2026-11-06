@@ -109,6 +109,7 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
+const APP_VERSION = '6.11';
 /* =====================================================================
    יומן בריאות — core: constants, storage, dates, cycle, daily metrics
    All data lives in localStorage under keys prefixed "tracker." so it never
@@ -151,7 +152,7 @@ const BELLY_HELP = ['חימום', 'תה', 'הליכה', 'מנוחה', 'משכך 
 const SEVERITY = ['קלה', 'בינונית', 'חזקה', 'קשה'];
 
 const GEN_GROUPS = [
-  ['ראש וקוגניציה', ['כאב ראש', 'מיגרנה', 'ערפל מוחי', 'סחרחורת']],
+  ['ראש וקוגניציה', ['כאב ראש', 'מיגרנה', 'ערפל מוחי', 'קושי להתרכז', 'סחרחורת']],
   ['אנרגיה ושינה', ['עייפות קיצונית', 'נדודי שינה']],
   ['חום וגוף', ['חום', 'צמרמורות', 'גלי חום', 'דופק מהיר', 'כאבי שרירים כלליים']],
   ['צינון ונשימה', ['צינון', 'נזלת', 'גודש באף', 'כאב גרון', 'שיעול']],
@@ -163,7 +164,7 @@ const GEN_GROUPS = [
 const BRISTOL = ['גושים קשים ונפרדים', 'נקניק עם גושים', 'נקניק עם סדקים', 'חלקה ורכה', 'חתיכות רכות', 'רכה ודייסתית', 'מימית'];
 const BRISTOL_C = ['#7A3F1E', '#93522A', '#A86A3C', '#5B3A7A', '#B07D1A', '#C0603A', '#B23A48'];
 
-const BLEED = ['אין', 'הכתמה', 'קל', 'בינוני', 'כבד'];
+const BLEED = ['אין', 'דם בניגוב', 'הכתמה', 'קל', 'בינוני', 'כבד'];
 const CYCLE_EXTRAS = ['קרישי דם', 'כתמים בין מחזורים'];
 const SLEEP_H = ['פחות מ-5', '5–6', '6–7', '7–8', '8+'];
 const SLEEP_H_NUM = [4.5, 5.5, 6.5, 7.5, 8.5];
@@ -597,7 +598,7 @@ function renderDay() {
     <h1>${fmtLong(s)}</h1>
     ${c ? `<div class="row small" style="display:inline-flex;margin-top:8px;padding:5px 12px;border-radius:14px;background:#F3E7EA;color:#8E2F52;font-weight:700"><span class="dot" style="width:7px;height:7px;background:var(--rose)"></span>יום ${c.cd} במחזור${c.predicted ? ' (צפוי)' : ''}</div>` : `<div class="xs muted" style="margin-top:6px">יום במחזור יחושב אוטומטית אחרי שתסמני ימי דימום</div>`}
     ${suggestCard()}
-    ${section('cycle', 'מחזור', '#B85C7E', isBleed(d.bleed) || d.bleed === 'הכתמה' ? 'דימום: ' + d.bleed + (d.extras.length ? ' · ' + d.extras.join(', ') : '') : d.bleed === 'אין' ? 'אין דימום' : 'לא מולא',
+    ${section('cycle', 'מחזור', '#B85C7E', isBleed(d.bleed) || d.bleed === 'הכתמה' || d.bleed === 'דם בניגוב' ? 'דימום: ' + d.bleed + (d.extras.length ? ' · ' + d.extras.join(', ') : '') : d.bleed === 'אין' ? 'אין דימום' : 'לא מולא',
       () => `<div class="lbl">דימום</div>${chips(BLEED, x => (d.bleed || '') === x, 'bleed')}<div class="lbl">נוסף (לא חובה)</div>${chips(CYCLE_EXTRAS, x => d.extras.includes(x), 'extra')}`)}
     ${section('sleep', 'שינה', '#3F6FA8', [d.sleepH ? d.sleepH + ' שעות' : '', d.sleepQ, d.dream && d.dream !== 'לא זוכרת' ? d.dream : ''].filter(Boolean).join(' · ') || 'לא מולא',
       () => `<div class="lbl">כמה שעות? (הלילה שעבר)</div>${chips(SLEEP_H, x => d.sleepH === x, 'sleepH')}<div class="lbl">איכות</div>${chips(SLEEP_Q, x => d.sleepQ === x, 'sleepQ')}<div class="lbl">חלומות</div>${chips(DREAMS, x => d.dream === x, 'dream')}`)}
@@ -688,7 +689,7 @@ function foodCard(s) {
     <div class="lbl">הכנה</div>${chips(PREP, x => S.prep === x, 'prep')}
     <label class="lbl" for="foodIn" style="display:block">מה אכלת?</label>
     <div class="row">
-      <input id="foodIn" class="input" list="foodList" placeholder="לדוגמה: פסטה עם רוטב עגבניות" autocomplete="off" enterkeyhint="done" data-enter="addFood">
+      <input id="foodIn" class="input" list="foodList" placeholder="לדוגמה: פסטה עם רוטב עגבניות" autocomplete="off" enterkeyhint="done" data-enter="addFood" data-input="foodDraft" value="${esc(S.foodDraft || '')}">
       <button class="btn" style="flex:0 0 auto" data-act="addFood">הוספה</button>
     </div>
     <datalist id="foodList">${[...new Set(Object.keys(DATA.foodLib).concat(Object.keys(FOOD_DICT)))].map(n => `<option value="${esc(n)}">`).join('')}</datalist>
@@ -1679,7 +1680,7 @@ function renderSettings() {
       <button class="btn block" data-act="export">ייצוא נתונים (גיבוי + ניתוח עם Claude)</button>
       <label class="btn ghost block" style="display:flex;align-items:center;justify-content:center;margin-top:8px">שחזור מגיבוי<input type="file" accept="application/json,.json" style="display:none" data-change="import"></label>
       <div class="xs muted" style="margin-top:8px">קובץ הייצוא כולל גם את יומן האימונים מ-Workout Pro, כדי שהניתוח יראה את התמונה המלאה. השחזור מחליף רק את נתוני היומן הזה.</div></section>
-    <div class="xs muted" style="text-align:center;margin-top:16px">יומן בריאות · כל הנתונים נשמרים על המכשיר בלבד</div>`;
+    <div class="xs muted" style="text-align:center;margin-top:16px">יומן בריאות · גרסה ${APP_VERSION} · כל הנתונים נשמרים על המכשיר בלבד</div>`;
 }
 
 /* =====================================================================
@@ -1720,7 +1721,7 @@ const ACT = {
   selDay: a => { if (S.sel === a) return ACT.openDay(a); S.sel = a; render(); },
   openDay: a => { S.openSec = {}; S.day = a; S.sel = a; S.pending = null; history.pushState({ v: 'day' }, ''); render(); window.scrollTo(0, 0); },
   back: () => { if (history.state && history.state.v === 'day') history.back(); else { S.day = null; render(); } },
-  dayNav: a => { S.suppEdit = null; S.openSec = {}; S.day = addDays(S.day, Number(a)); S.sel = S.day; S.month = S.day.slice(0, 7); S.pending = null; render(); },
+  dayNav: a => { S.foodDraft = ''; S.suppEdit = null; S.openSec = {}; S.day = addDays(S.day, Number(a)); S.sel = S.day; S.month = S.day.slice(0, 7); S.pending = null; render(); },
   bleed: a => { editDay(S.day).bleed = a === 'אין' ? 'אין' : a; save(); render(); },
   extra: a => { toggleIn(editDay(S.day).extras, a); save(); render(); },
   sleepH: a => { const d = editDay(S.day); d.sleepH = d.sleepH === a ? '' : a; save(); render(); },
@@ -1738,7 +1739,7 @@ const ACT = {
   suppEditDone: () => { S.suppEdit = null; render(); },
   slot: a => { S.slot = a; render(); },
   prep: a => { S.prep = a; render(); },
-  addFood: () => { const el = document.getElementById('foodIn'); addFoodName(el && el.value); render(); const n = document.getElementById('foodIn'); if (n && !S.pending) n.focus(); },
+  addFood: () => { const el = document.getElementById('foodIn'); addFoodName(el && el.value); S.foodDraft = ''; render(); const n = document.getElementById('foodIn'); if (n && !S.pending) n.focus(); },
   quickFood: a => { addFoodName(a); render(); },
   rmFood: a => { editDay(S.day).foods.splice(Number(a), 1); save(); render(); },
   pcat: a => { toggleIn(S.pending.cats, a); render(); },
@@ -1812,6 +1813,7 @@ document.addEventListener('input', e => {
   if (k === 'cTime') S.comp.t = el.value;
   else if (k === 'cNote') S.comp.note = el.value;
   else if (k === 'cTemp') S.comp.temp = el.value;
+  else if (k === 'foodDraft') S.foodDraft = el.value;
   else if (k === 'tName') S.toolEd.name = el.value;
   else if (k === 'tUrl') S.toolEd.url = el.value.trim();
   else if (k === 'tText') S.toolEd.text = el.value;
