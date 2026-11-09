@@ -1,5 +1,5 @@
 // Offline support: serve the app shell from cache, refresh it in the background.
-const CACHE = 'tracker-v1';
+const CACHE = 'tracker-v2';
 const SHELL = ['./tracker.html', './tracker-manifest.json', './tracker-icon-192.png', './tracker-icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -15,7 +15,8 @@ self.addEventListener('fetch', e => {
   if (url.origin !== location.origin) return; // fonts etc. go straight to the network
   // network first for the page itself (so updates arrive), cache as fallback offline
   e.respondWith(
-    fetch(req).then(res => {
+    // no-cache: always ask the server whether there is a newer version (skips the browser's 10-minute cache)
+    fetch(req, { cache: 'no-cache' }).then(res => {
       if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
       return res;
     }).catch(() => caches.match(req).then(r => r || caches.match('./tracker.html')))
