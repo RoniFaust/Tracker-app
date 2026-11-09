@@ -109,7 +109,7 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
-const APP_VERSION = '6.11ג';
+const APP_VERSION = '9.11ד';
 const isHM = v => typeof v === 'string' && /^\d\d:\d\d$/.test(v);
 /* =====================================================================
    יומן בריאות — core: constants, storage, dates, cycle, daily metrics
@@ -151,6 +151,7 @@ const PAIN_IMPACT = ['לא הפריע', 'הפריע קצת', 'נאלצתי לע�
 
 const BELLY_SYMS = ['נפיחות', 'בטן קשה למגע', 'גזים', 'כאב בטן', 'התכווצויות בטן', 'עוויתות', 'דקירות', 'צרבת', 'בחילה', 'תחושת מלאות מהירה'];
 const STOOL_SYMS = ['דחיפות', 'תחושת ריקון חלקי', 'כאב ביציאה', 'מאמץ / לחץ', 'ריר', 'דם'];
+const TRY_SYMS = ['צורך / דחף', 'מאמץ / לחץ', 'כאב', 'תחושת ריקון חלקי', 'התכווצויות'];
 const URINE_SYMS = ['תכיפות', 'דחיפות', 'כאב / צריבה', 'תחושת ריקון חלקי', 'דם בשתן'];
 const BELLY_WHEN = ['אחרי אוכל', 'סטרס', 'מחזור', 'קפה', 'ארוחה גדולה', 'ארוחה מאוחרת'];
 const BELLY_HELP = ['חימום', 'תה', 'הליכה', 'מנוחה', 'משכך כאבים או תרופה', 'שום דבר'];
@@ -160,7 +161,7 @@ const GEN_GROUPS = [
   ['ראש וקוגניציה', ['כאב ראש', 'מיגרנה', 'ערפל מוחי', 'קושי להתרכז', 'סחרחורת']],
   ['אנרגיה ושינה', ['עייפות קיצונית', 'נדודי שינה']],
   ['חום וגוף', ['חום', 'צמרמורות', 'גלי חום', 'דופק מהיר', 'כאבי שרירים כלליים']],
-  ['צינון ונשימה', ['צינון', 'נזלת', 'גודש באף', 'כאב גרון', 'שיעול']],
+  ['צינון ונשימה', ['צינון', 'נזלת', 'גודש באף', 'כאב גרון', 'שיעול', 'ליחה', 'צרידות']],
   ['הורמונלי', ['רגישות בשדיים', 'אקנה', 'רגישות לריחות']],
   ['עור ואלרגיה', ['גירוד', 'פריחה', 'סרפדת (חבורות מגרדות)', 'תגובה חזקה לעקיצה', 'עקיצה שלא עוברת', 'עיניים מגרדות / דומעות', 'התעטשויות']],
   ['תיאבון', ['תיאבון מוגבר', 'תיאבון ירוד']]
@@ -175,6 +176,8 @@ const SLEEP_H = ['פחות מ-5', '5–6', '6–7', '7–8', '8+'];
 const SLEEP_H_NUM = [4.5, 5.5, 6.5, 7.5, 8.5];
 const SLEEP_Q = ['גרועה', 'בינונית', 'טובה', 'מצוינת'];
 const DREAMS = ['לא זוכרת', 'חלומות', 'חלומות רעים'];
+const WAKES = ['לא התעוררתי', 'פעם אחת', 'פעמיים', '3 ומעלה'];
+const MORNING = ['קמתי כרגיל', 'התעוררתי מוקדם ולא נרדמתי שוב', 'התעוררתי מוקדם ונרדמתי שוב'];
 
 const SLOTS = ['כל היום', 'בוקר', 'צהריים', 'ערב', 'ביניים / נשנוש', 'לילה'];
 const PREP = ['ביתי', 'קנוי', 'בחוץ / מסעדה'];
@@ -232,6 +235,8 @@ function load() {
   DATA.foodLib = DATA.foodLib || {};
   let migrated = false;
   // foods saved before the dictionary knew them: try again (only if never confirmed and still empty)
+  // a stool entry with no Bristol whose note says nothing came out = an attempt
+  Object.values(DATA.days).forEach(d => (d.entries || []).forEach(e => { if (e.kind === 'stool' && !e.bristol && e.what !== 'שתן' && e.what !== 'ניסיון ללא יציאה' && /ללא יציאה|בלי יציאה|לא יצא/.test(e.note || '')) { e.what = 'ניסיון ללא יציאה'; migrated = true; } }));
   if (typeof guessFoodCats === 'function') Object.keys(DATA.foodLib).forEach(n => { const f = DATA.foodLib[n]; if (!f.confirmed && !(f.cats || []).length) { const g = guessFoodCats(n).cats; if (g.length) { f.cats = g; migrated = true; } } });
   if (migrated) try { localStorage.setItem(KEY, JSON.stringify(DATA)); } catch (e) {}
   DATA.supps = DATA.supps || defaultSupps();
@@ -576,9 +581,9 @@ function kindSummary(kind, list) {
   if (kind === 'energy') return n + ' · ממוצע ' + fmt1(avg(list.map(e => e.energy))) + '/5';
   if (kind === 'pain') return n + ' · מקסימום ' + Math.max(...list.map(e => e.pain)) + '/10';
   if (kind === 'stool') {
-    const st = list.filter(e => e.what !== 'שתן'), ur = list.filter(e => e.what === 'שתן');
+    const st = list.filter(e => e.what !== 'שתן' && e.what !== 'ניסיון ללא יציאה'), ur = list.filter(e => e.what === 'שתן'), tr = list.filter(e => e.what === 'ניסיון ללא יציאה');
     const br = st.map(e => e.bristol).filter(Boolean);
-    return [st.length ? (st.length === 1 ? 'יציאה אחת' : st.length + ' יציאות') + (br.length ? ' (בריסטול ' + br.join(', ') + ')' : '') : '', ur.length ? 'שתן: ' + [...new Set([].concat(...ur.map(e => e.syms || [])))].join(', ') : ''].filter(Boolean).join(' · ');
+    return [st.length ? (st.length === 1 ? 'יציאה אחת' : st.length + ' יציאות') + (br.length ? ' (בריסטול ' + br.join(', ') + ')' : '') : '', tr.length ? (tr.length === 1 ? 'ניסיון אחד ללא יציאה' : tr.length + ' ניסיונות ללא יציאה') : '', ur.length ? 'שתן: ' + [...new Set([].concat(...ur.map(e => e.syms || [])))].join(', ') : ''].filter(Boolean).join(' · ');
   }
   const mx = Math.max(...list.map(e => SEVERITY.indexOf(e.sev)));
   const syms = [...new Set([].concat(...list.map(e => e.syms || [])))];
@@ -610,11 +615,15 @@ function renderDay() {
     ${suggestCard()}
     ${section('cycle', 'מחזור', '#B85C7E', isBleed(d.bleed) || d.bleed === 'הכתמה' || d.bleed === 'דם בניגוב' ? 'דימום: ' + d.bleed + (d.extras.length ? ' · ' + d.extras.join(', ') : '') : d.bleed === 'אין' ? 'אין דימום' : 'לא מולא',
       () => `<div class="lbl">דימום</div>${chips(BLEED, x => (d.bleed || '') === x, 'bleed')}<div class="lbl">נוסף (לא חובה)</div>${chips(CYCLE_EXTRAS, x => d.extras.includes(x), 'extra')}`)}
-    ${section('sleep', 'שינה', '#3F6FA8', [d.sleepH ? d.sleepH + ' שעות' : '', d.bedT && d.wakeT ? d.bedT + '–' + d.wakeT : '', d.sleepQ, d.dream && d.dream !== 'לא זוכרת' ? d.dream : ''].filter(Boolean).join(' · ') || 'לא מולא',
+    ${section('sleep', 'שינה', '#3F6FA8', [d.sleepH ? d.sleepH + ' שעות' : '', d.bedT && d.wakeT ? d.bedT + '–' + d.wakeT : '', d.sleepQ, d.wakes && d.wakes !== 'לא התעוררתי' ? 'התעוררתי ' + d.wakes : '', d.morning && d.morning !== 'קמתי כרגיל' ? (d.morning.includes('ונרדמתי') ? 'קימה מוקדמת + שינה שנייה' : 'קימה מוקדמת') : '', d.dream && d.dream !== 'לא זוכרת' ? d.dream : '', d.sleepNote ? '✎' : ''].filter(Boolean).join(' · ') || 'לא מולא',
       () => `<div class="lbl">כמה שעות? (הלילה שעבר)</div>${chips(SLEEP_H, x => d.sleepH === x, 'sleepH')}<div class="lbl">איכות</div>${chips(SLEEP_Q, x => d.sleepQ === x, 'sleepQ')}<div class="lbl">חלומות</div>${chips(DREAMS, x => d.dream === x, 'dream')}
       <div class="lbl">שעות (לא חובה)</div><div class="row" style="gap:10px;flex-wrap:wrap">
         <label class="small muted" for="bedT">נרדמתי בערך</label><input id="bedT" type="time" class="input" style="width:120px;min-height:40px" value="${esc(d.bedT || '')}" data-input="bedT">
-        <label class="small muted" for="wakeT">קמתי</label><input id="wakeT" type="time" class="input" style="width:120px;min-height:40px" value="${esc(d.wakeT || '')}" data-input="wakeT"></div>`)}
+        <label class="small muted" for="wakeT">קמתי</label><input id="wakeT" type="time" class="input" style="width:120px;min-height:40px" value="${esc(d.wakeT || '')}" data-input="wakeT"></div>
+      <div class="lbl">התעוררויות באמצע הלילה (לא חובה)</div>${chips(WAKES, x => d.wakes === x, 'wakes')}
+      <div class="lbl">בבוקר (לא חובה)</div>${chips(MORNING, x => d.morning === x, 'morning')}
+      <label class="lbl" style="display:block" for="sleepNote">הערה על השינה (לא חובה)</label>
+      <textarea id="sleepNote" class="input" rows="2" placeholder="לדוגמה: ערה מ-8, נרדמתי שוב בערך 9–10" data-input="sleepNote">${esc(d.sleepNote || '')}</textarea>`)}
     ${entrySecs}
     ${section('food', 'אוכל', '#C0603A', foodsN ? (foodsN === 1 ? 'פריט אחד' : foodsN + ' פריטים') + (d.feel ? ' · תחושה ' + d.feel + '/5' : '') + (d.craves.length ? ' · ' + d.craves.join(', ') : '') : 'לא מולא', () => foodCard(s))}
     ${section('supp', 'תוספים', '#8F6B1E', st.due ? st.done + ' מתוך ' + st.due + ' מנות' : 'אין מתוכננים היום', () => suppCard(s))}
@@ -637,6 +646,7 @@ function entrySummary(e) {
     c: KIND_C.pain
   };
   if (e.kind === 'energy') return { title: 'אנרגיה ' + e.energy + '/5 · ' + ENERGY_LABELS[e.energy - 1], sub: '', c: ENERGY_C[Math.max(0, e.energy - 1)] === '#F6EBC8' ? '#DDBB5C' : ENERGY_C[e.energy - 1] };
+  if (e.kind === 'stool' && e.what === 'ניסיון ללא יציאה') return { title: 'ניסיון ללא יציאה', sub: (e.syms || []).join(', '), c: '#9A8FA3' };
   if (e.kind === 'stool' && e.what === 'שתן') return { title: 'שתן', sub: (e.syms || []).join(', '), c: '#C9A227' };
   if (e.kind === 'stool') return { title: 'יציאה' + (e.bristol ? ' · בריסטול ' + e.bristol : ''), sub: [e.bristol ? BRISTOL[e.bristol - 1] : '', (e.syms || []).join(', ')].filter(Boolean).join(' · '), c: e.bristol ? BRISTOL_C[e.bristol - 1] : KIND_C.stool };
   const syms = (e.syms || []).join(', ');
@@ -693,7 +703,12 @@ function foodCard(s) {
   const groups = SLOTS.filter(sl => d.foods.some(f => f.slot === sl)).map(sl => `
     <div style="padding:8px 0;border-bottom:1px solid var(--line2)">
       <div class="small" style="font-weight:700;color:var(--accent);margin-bottom:4px">${sl}</div>
-      <div class="wrap">${d.foods.map((f, i) => f.slot === sl ? `<span class="row" style="gap:2px;background:var(--bg);border-radius:16px;padding:2px 4px 2px 10px;font-size:14px">${f.t ? `<span class="xs" style="font-weight:700;color:var(--accent)">${esc(f.t)}</span> ` : ''}${esc(f.name)}${f.prep && f.prep !== 'ביתי' ? ` <span class="xs muted">(${esc(f.prep)})</span>` : f.prep ? ' <span class="xs muted">(ביתי)</span>' : ''}<button class="iconbtn" style="width:32px;height:32px;color:var(--muted)" aria-label="הסרת ${esc(f.name)}" data-act="rmFood" data-a="${i}">${ICON.x}</button></span>` : '').join('')}</div>
+      <div class="wrap">${d.foods.map((f, i) => f.slot === sl ? `<span class="row" style="gap:2px;background:var(--bg);border-radius:16px;padding:2px 4px 2px 10px;font-size:14px">${f.t ? `<span class="xs" style="font-weight:700;color:var(--accent)">${esc(f.t)}</span> ` : ''}<button type="button" style="background:none;border:none;padding:4px 0;font-size:14px;text-align:right" data-act="foodEdit" data-a="${i}" aria-label="עריכת ${esc(f.name)}">${esc(f.name)}${f.prep ? ` <span class="xs muted">(${esc(f.prep)})</span>` : ' <span class="xs" style="color:#A3324A">(הכנה?)</span>'}</button><button class="iconbtn" style="width:32px;height:32px;color:var(--muted)" aria-label="הסרת ${esc(f.name)}" data-act="rmFood" data-a="${i}">${ICON.x}</button></span>` : '').join('')}</div>
+      ${S.foodEdit != null && d.foods[S.foodEdit] && d.foods[S.foodEdit].slot === sl ? (() => { const f = d.foods[S.foodEdit]; return `<div style="margin-top:8px;padding:10px;border-radius:12px;background:#fff;border:1px solid #D9CCE4">
+        <div class="small" style="font-weight:700;margin-bottom:6px">${esc(f.name)}</div>
+        <div class="wrap">${PREP.map(x => chip(x, f.prep === x, 'fPrep', x)).join('')}</div>
+        <div class="row" style="margin-top:8px;gap:8px"><label class="small muted" for="fT">שעה</label><input id="fT" type="time" class="input" style="width:120px;min-height:40px" value="${esc(f.t || '')}" data-input="fT">
+          <button class="chip" data-act="foodEditDone">סגירה</button></div></div>`; })() : ''}
     </div>`).join('');
   const p = S.pending;
   const recent = recentFoods();
@@ -703,7 +718,8 @@ function foodCard(s) {
     <div class="row" style="margin-top:8px;gap:8px"><label class="small muted" for="foodTime">שעה (לא חובה)</label>
       <input id="foodTime" type="time" class="input" style="width:120px;min-height:40px" value="${esc(S.foodTime || '')}" data-input="foodTime">
       ${S.day === todayS() ? `<button class="chip" style="min-height:36px" data-act="foodNow">עכשיו</button>` : ''}${S.foodTime ? `<button class="chip" style="min-height:36px" data-act="foodTimeClear">ניקוי</button>` : ''}</div>
-    <div class="lbl">הכנה</div>${chips(PREP, x => S.prep === x, 'prep')}
+    <div class="lbl">הכנה</div><div class="wrap">${chip('אוטומטי', !S.prepTouched, 'prep', 'auto')}${PREP.map(x => chip(x, S.prepTouched && S.prep === x, 'prep', x)).join('')}</div>
+    <div class="xs muted" style="margin-top:4px">${S.prepTouched ? 'ייקבע רק לפריט הבא, ואז חוזר לאוטומטי.' : 'כל מאכל יקבל את ההכנה שבחרת לו בפעם הקודמת. למאכל חדש תישאלי.'}</div>
     <label class="lbl" for="foodIn" style="display:block">מה אכלת?</label>
     <div class="row">
       <input id="foodIn" class="input" list="foodList" placeholder="לדוגמה: פסטה עם רוטב עגבניות" autocomplete="off" enterkeyhint="done" data-enter="addFood" data-input="foodDraft" value="${esc(S.foodDraft || '')}">
@@ -714,6 +730,7 @@ function foodCard(s) {
       <div style="font-weight:700">פריט חדש: ${esc(p.name)}</div>
       <div class="small" style="color:var(--ink2);margin:2px 0 8px">${p.guessed ? 'זיהיתי את הקבוצות המסומנות. אפשר לתקן בלחיצה — שואלים רק בפעם הראשונה.' : 'לא זיהיתי אוטומטית. לאילו קבוצות הוא שייך? שואלים רק בפעם הראשונה.'}</div>
       <div class="wrap">${FOOD_CATS.map(c => chip(c[1], p.cats.includes(c[0]), 'pcat', c[0])).join('')}</div>
+      <div class="lbl">הכנה הפעם</div><div class="wrap">${PREP.map(x => chip(x, p.prep === x, 'pPrep', x)).join('')}</div>
       <div class="row" style="margin-top:10px"><button class="btn" style="flex:1;background:var(--gold)" data-act="confirmFood">אישור</button><button class="btn ghost" data-act="skipFood">אחר כך</button></div>
     </div>` : ''}
     ${recent.length ? `<div class="lbl">הוספה מהירה</div><div class="wrap">${recent.map(n => `<button class="chip dashed" data-act="quickFood" data-a="${esc(n)}">+ ${esc(n)}</button>`).join('')}</div>` : ''}
@@ -777,9 +794,9 @@ function renderSheet() {
       <div class="lbl">קשור ל… (לא חובה)</div>${tog('when', BELLY_WHEN)}
       <div class="lbl">מה עזר? (לא חובה)</div>${tog('help', BELLY_HELP)}`;
   } else if (c.kind === 'stool') {
-    const urine = c.what === 'שתן';
-    body = `<div class="lbl">מה רושמים?</div>${chips(['יציאה', 'שתן'], x => (c.what || 'יציאה') === x, 'cWhat')}
-      ${urine ? `<div class="lbl">מה הרגשת?</div>${tog('syms', URINE_SYMS)}` : `<div class="lbl">סולם בריסטול — מה הכי מתאים?</div>
+    const urine = c.what === 'שתן', attempt = c.what === 'ניסיון ללא יציאה';
+    body = `<div class="lbl">מה רושמים?</div>${chips(['יציאה', 'ניסיון ללא יציאה', 'שתן'], x => (c.what || 'יציאה') === x, 'cWhat')}
+      ${attempt ? `<div class="lbl">מה היה?</div>${tog('syms', TRY_SYMS)}` : urine ? `<div class="lbl">מה הרגשת?</div>${tog('syms', URINE_SYMS)}` : `<div class="lbl">סולם בריסטול — מה הכי מתאים?</div>
       <div class="bristol" style="display:grid;gap:6px">${BRISTOL.map((b, i) => `<button type="button" aria-pressed="${c.bristol === i + 1}" data-act="cNum" data-a="bristol::${i + 1}"><span class="n" style="background:${BRISTOL_C[i]}">${i + 1}</span>${b}</button>`).join('')}</div>
       <div class="lbl">נוסף (לא חובה)</div>${tog('syms', STOOL_SYMS)}`}`;
   } else {
@@ -806,7 +823,7 @@ function compToEntry(c) {
   if (c.kind === 'mood') { const o = Object.assign(base, { emos: c.emos, intensity: c.intensity, score: c.score }); if (c.energy) o.energy = c.energy; return o; }
   if (c.kind === 'energy') return Object.assign(base, { energy: c.energy });
   if (c.kind === 'pain') return Object.assign(base, { side: c.side || '', areas: c.areas, pain: c.pain, types: c.types, impact: c.impact, when: c.when, help: c.help });
-  if (c.kind === 'stool') return c.what === 'שתן' ? Object.assign(base, { what: 'שתן', syms: c.syms }) : Object.assign(base, { what: 'יציאה', bristol: c.bristol, syms: c.syms });
+  if (c.kind === 'stool') return c.what === 'שתן' || c.what === 'ניסיון ללא יציאה' ? Object.assign(base, { what: c.what, syms: c.syms }) : Object.assign(base, { what: 'יציאה', bristol: c.bristol, syms: c.syms });
   if (c.kind === 'belly') return Object.assign(base, { syms: c.syms, sev: c.sev, when: c.when, help: c.help });
   return Object.assign(base, { syms: c.syms, sev: c.sev, temp: c.syms.includes('חום') ? c.temp : '' });
 }
@@ -1723,17 +1740,29 @@ const split2 = a => { const i = a.indexOf('::'); return [a.slice(0, i), a.slice(
 const toggleIn = (arr, x) => { const i = arr.indexOf(x); if (i >= 0) arr.splice(i, 1); else arr.push(x); };
 function supp(id) { return DATA.supps.find(s => s.id === id); }
 
+function lastPrepOf(name) {
+  const lib = DATA.foodLib[name];
+  if (lib && lib.lastPrep) return lib.lastPrep;
+  const ds = Object.keys(DATA.days).sort().reverse();
+  for (const s of ds) { const f = (DATA.days[s].foods || []).slice().reverse().find(x => x.name === name && x.prep); if (f) return f.prep; }
+  return '';
+}
 function addFoodName(name) {
   name = (name || '').trim().replace(/\s+/g, ' ');
   if (!name) return;
   const d = editDay(S.day);
-  const item = { name, slot: S.slot, prep: S.prep }; if (S.foodTime) item.t = S.foodTime;
+  // prep: chosen for this item, else the one this food had last time, else ask (new food card)
+  const prep = S.prepTouched ? S.prep : lastPrepOf(name);
+  const item = { name, slot: S.slot, prep: prep || '' }; if (S.foodTime) item.t = S.foodTime;
   d.foods.push(item);
+  if (prep && DATA.foodLib[name]) DATA.foodLib[name].lastPrep = prep;
   if (!DATA.foodLib[name]) {
     const g = guessFoodCats(name);
     DATA.foodLib[name] = { cats: g.cats, confirmed: false };
-    S.pending = { name, cats: g.cats.slice(), guessed: g.guessed };
+    if (prep) DATA.foodLib[name].lastPrep = prep;
+    S.pending = { name, cats: g.cats.slice(), guessed: g.guessed, prep: prep || '', idx: d.foods.length - 1 };
   }
+  S.prepTouched = false;
   save();
 }
 
@@ -1746,11 +1775,13 @@ const ACT = {
   selDay: a => { if (S.sel === a) return ACT.openDay(a); S.sel = a; render(); },
   openDay: a => { S.openSec = {}; S.day = a; S.sel = a; S.pending = null; history.pushState({ v: 'day' }, ''); render(); window.scrollTo(0, 0); },
   back: () => { if (history.state && history.state.v === 'day') history.back(); else { S.day = null; render(); } },
-  dayNav: a => { S.foodDraft = ''; S.foodTime = ''; S.craveEdit = null; S.suppEdit = null; S.openSec = {}; S.day = addDays(S.day, Number(a)); S.sel = S.day; S.month = S.day.slice(0, 7); S.pending = null; render(); },
+  dayNav: a => { S.foodEdit = null; S.prepTouched = false; S.foodDraft = ''; S.foodTime = ''; S.craveEdit = null; S.suppEdit = null; S.openSec = {}; S.day = addDays(S.day, Number(a)); S.sel = S.day; S.month = S.day.slice(0, 7); S.pending = null; render(); },
   bleed: a => { editDay(S.day).bleed = a === 'אין' ? 'אין' : a; save(); render(); },
   extra: a => { toggleIn(editDay(S.day).extras, a); save(); render(); },
   sleepH: a => { const d = editDay(S.day); d.sleepH = d.sleepH === a ? '' : a; save(); render(); },
   sleepQ: a => { const d = editDay(S.day); d.sleepQ = d.sleepQ === a ? '' : a; save(); render(); },
+  morning: a => { const d = editDay(S.day); d.morning = d.morning === a ? '' : a; save(); render(); },
+  wakes: a => { const d = editDay(S.day); d.wakes = d.wakes === a ? '' : a; save(); render(); },
   dream: a => { const d = editDay(S.day); d.dream = d.dream === a ? '' : a; save(); render(); },
   // first tap: mark as taken now (today) or open the time editor (another day); tap a taken one: edit time / undo
   supp: a => {
@@ -1763,12 +1794,16 @@ const ACT = {
   suppUntake: a => { delete editDay(S.day).supp[a]; S.suppEdit = null; save(); render(); },
   suppEditDone: () => { S.suppEdit = null; render(); },
   slot: a => { S.slot = a; render(); },
-  prep: a => { S.prep = a; render(); },
+  prep: a => { if (a === 'auto') S.prepTouched = false; else { S.prep = a; S.prepTouched = true; } render(); },
+  pPrep: a => { const p = S.pending; p.prep = a; const f = editDay(S.day).foods[p.idx]; if (f && f.name === p.name) f.prep = a; DATA.foodLib[p.name].lastPrep = a; save(); render(); },
+  foodEdit: a => { S.foodEdit = S.foodEdit === Number(a) ? null : Number(a); render(); },
+  foodEditDone: () => { S.foodEdit = null; render(); },
+  fPrep: a => { const f = editDay(S.day).foods[S.foodEdit]; if (!f) return; f.prep = a; if (DATA.foodLib[f.name]) DATA.foodLib[f.name].lastPrep = a; save(); render(); },
   addFood: () => { const el = document.getElementById('foodIn'); addFoodName(el && el.value); S.foodDraft = ''; render(); const n = document.getElementById('foodIn'); if (n && !S.pending) n.focus(); },
   quickFood: a => { addFoodName(a); render(); },
-  rmFood: a => { editDay(S.day).foods.splice(Number(a), 1); save(); render(); },
+  rmFood: a => { S.foodEdit = null; if (S.pending) S.pending = null; editDay(S.day).foods.splice(Number(a), 1); save(); render(); },
   pcat: a => { toggleIn(S.pending.cats, a); render(); },
-  confirmFood: () => { DATA.foodLib[S.pending.name] = { cats: S.pending.cats.slice(), confirmed: true }; S.pending = null; save(); render(); toast('נשמר בספריית המאכלים'); },
+  confirmFood: () => { DATA.foodLib[S.pending.name] = { cats: S.pending.cats.slice(), confirmed: true, lastPrep: S.pending.prep || undefined }; S.pending = null; save(); render(); toast('נשמר בספריית המאכלים'); },
   skipFood: () => { S.pending = null; render(); },
   // cravings keep the time they were marked; tap a marked one to edit its time or undo
   crave: a => {
@@ -1796,8 +1831,8 @@ const ACT = {
     const c = S.comp;
     if ((c.kind === 'belly' || c.kind === 'other') && !c.syms.length) { toast('בחרי לפחות תסמין אחד'); return; }
     if (c.kind === 'energy' && !c.energy) { toast('בחרי רמת אנרגיה'); return; }
-    if (c.kind === 'stool' && c.what !== 'שתן' && !c.bristol && !c.syms.length) { toast('בחרי סוג בסולם בריסטול'); return; }
-    if (c.kind === 'stool' && c.what === 'שתן' && !c.syms.length) { toast('בחרי מה הרגשת'); return; }
+    if (c.kind === 'stool' && c.what === 'יציאה' && !c.bristol && !c.syms.length) { toast('בחרי סוג בסולם בריסטול'); return; }
+    if (c.kind === 'stool' && c.what !== 'יציאה' && !c.syms.length) { toast('בחרי מה הרגשת'); return; }
     if (c.kind === 'mood' && !c.emos.length && !c.score) { toast('בחרי רגש או מצב רוח כללי'); return; }
     S.openSec[c.kind] = true;
     const d = editDay(S.day); const e = compToEntry(c);
@@ -1855,7 +1890,9 @@ document.addEventListener('input', e => {
   else if (k === 'cTemp') S.comp.temp = el.value;
   else if (k === 'foodDraft') S.foodDraft = el.value;
   else if (k === 'foodTime') S.foodTime = el.value;
+  else if (k === 'fT') { const f = editDay(S.day).foods[S.foodEdit]; if (f) { if (el.value) f.t = el.value; else delete f.t; save(); } }
   else if (k === 'craveAt') { const d = editDay(S.day); d.craveT = d.craveT || {}; d.craveT[el.dataset.a] = el.value || true; save(); }
+  else if (k === 'sleepNote') { editDay(S.day).sleepNote = el.value; save(); }
   else if (k === 'bedT') { editDay(S.day).bedT = el.value; save(); }
   else if (k === 'wakeT') { editDay(S.day).wakeT = el.value; save(); }
   else if (k === 'tName') S.toolEd.name = el.value;
@@ -1867,7 +1904,7 @@ document.addEventListener('input', e => {
   else if (k === 'gStep') S.sess.g.step = el.value;
   else if (k === 'gGrat') S.sess.g.grat[Number(el.dataset.a)] = el.value;
   else if (k === 'suppAt') { const d = editDay(S.day); d.supp[el.dataset.a] = el.value || true; save(); }
-  else if (k === 'dayNote') { clearTimeout(noteTimer); const s = S.day; noteTimer = setTimeout(() => { editDay(s).note = el.value; save(); }, 400); }
+  else if (k === 'dayNote') { editDay(S.day).note = el.value; save(); }
   else if (k === 'suppName') { supp(el.dataset.a).name = el.value; save(); }
   else if (k === 'suppDose') { supp(el.dataset.a).dose = el.value; save(); }
   else if (k === 'cycLen') { const v = Number(el.value); if (v >= 18 && v <= 50) { DATA.settings.cycleLen = v; save(); } }
