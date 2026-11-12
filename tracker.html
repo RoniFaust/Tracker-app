@@ -109,7 +109,27 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
-const APP_VERSION = '9.11ד';
+const APP_VERSION = '12.11ג';
+const AMOUNTS = ['½', '1', '1½', '2', '3'];
+// units: [singular, plural]
+const UNITS = [['יחידה', 'יחידות'], ['קובייה', 'קוביות'], ['פרוסה', 'פרוסות'], ['כף', 'כפות'], ['כפית', 'כפיות'], ['כוס', 'כוסות'],
+  ['חופן', 'חופנים'], ['מנה', 'מנות'], ['חפיסה', 'חפיסות'], ['שקית', 'שקיות'], ['קערה', 'קערות'], ['גרם', 'גרם']];
+// "5-7", "2", "½", "1½" -> a number (range = middle), for later analysis
+function qtyNum(q) {
+  if (q == null || q === '') return null;
+  const one = s => { s = String(s).trim().replace('½', '.5').replace(/^\./, '0.'); const v = parseFloat(s); return isNaN(v) ? null : v; };
+  const m = String(q).replace(/[–—]/g, '-').split('-').map(one).filter(v => v != null);
+  return m.length ? m.reduce((a, b) => a + b, 0) / m.length : null;
+}
+// how a food's amount reads: "5–7 כפות", "קובייה אחת", "2×" (old entries)
+function qtyText(f) {
+  const q = f.qty != null ? String(f.qty).replace('-', '–') : (f.amt && f.amt !== 1 ? (f.amt === 0.5 ? '½' : f.amt === 1.5 ? '1½' : String(f.amt)) : '');
+  const u = UNITS.find(x => x[0] === f.unit);
+  if (!u) return q ? q + '×' : '';
+  if (!q || q === '1') return u[0];
+  if (q === '½') return 'חצי ' + u[0];
+  return q + ' ' + u[1];
+}
 const isHM = v => typeof v === 'string' && /^\d\d:\d\d$/.test(v);
 /* =====================================================================
    יומן בריאות — core: constants, storage, dates, cycle, daily metrics
@@ -185,8 +205,8 @@ const CRAVES = ['מתוק', 'מלוח', 'שוקולד', 'פחמימות', 'רק 
 const FOOD_CATS = [
   ['gluten', 'גלוטן / לחם'], ['carbs', 'פחמימות'], ['dairy', 'מוצרי חלב'], ['eggs', 'ביצים'], ['sugar', 'סוכר ומתוקים'],
   ['caffeine', 'קפאין'], ['fried', 'מטוגן'], ['oil', 'שמן / שומן'], ['protein', 'מועשר בחלבון'], ['legumes', 'קטניות'], ['soy', 'סויה'], ['onion', 'בצל ושום'],
-  ['spicy', 'חריף'], ['alcohol', 'אלכוהול'], ['salty', 'חטיפים מלוחים'], ['veg', 'ירקות'],
-  ['fruit', 'פירות'], ['processed', 'מזון מעובד']
+  ['spicy', 'חריף'], ['alcohol', 'אלכוהול'], ['salty', 'חטיפים מלוחים'], ['salt', 'מלוח / כבוש'], ['fiber', 'עשיר בסיבים'], ['veg', 'ירקות'],
+  ['fruit', 'פירות'], ['dried', 'פרי מיובש'], ['processed', 'מזון מעובד']
 ];
 const catName = id => (FOOD_CATS.find(c => c[0] === id) || [id, id])[1];
 
@@ -238,6 +258,18 @@ function load() {
   // a stool entry with no Bristol whose note says nothing came out = an attempt
   Object.values(DATA.days).forEach(d => (d.entries || []).forEach(e => { if (e.kind === 'stool' && !e.bristol && e.what !== 'שתן' && e.what !== 'ניסיון ללא יציאה' && /ללא יציאה|בלי יציאה|לא יצא/.test(e.note || '')) { e.what = 'ניסיון ללא יציאה'; migrated = true; } }));
   if (typeof guessFoodCats === 'function') Object.keys(DATA.foodLib).forEach(n => { const f = DATA.foodLib[n]; if (!f.confirmed && !(f.cats || []).length) { const g = guessFoodCats(n).cats; if (g.length) { f.cats = g; migrated = true; } } });
+  // new groups (salty / pickled, high fiber): add them once to foods already in the library, without touching the user's other choices
+  if (typeof guessFoodCats === 'function' && !(DATA.settings && DATA.settings.cats2)) {
+    Object.keys(DATA.foodLib).forEach(n => { const f = DATA.foodLib[n]; f.cats = f.cats || []; guessFoodCats(n).cats.filter(c => c === 'salt' || c === 'fiber').forEach(c => { if (!f.cats.includes(c)) f.cats.push(c); }); });
+    DATA.settings = DATA.settings || { cycleLen: 28 }; DATA.settings.cats2 = true; migrated = true;
+  }
+  // new group (dried fruit): tag dried fruit already in the library; unconfirmed unsweetened ones lose the sugar tag
+  if (typeof guessFoodCats === 'function' && !(DATA.settings && DATA.settings.cats3)) {
+    Object.keys(DATA.foodLib).forEach(n => { const f = DATA.foodLib[n]; f.cats = f.cats || []; const g = guessFoodCats(n).cats; if (!g.includes('dried')) return;
+      if (!f.cats.includes('dried')) f.cats.push('dried'); if (!f.cats.includes('fruit')) f.cats.push('fruit');
+      if (!f.confirmed && !g.includes('sugar')) f.cats = f.cats.filter(c => c !== 'sugar'); });
+    DATA.settings = DATA.settings || { cycleLen: 28 }; DATA.settings.cats3 = true; migrated = true;
+  }
   if (migrated) try { localStorage.setItem(KEY, JSON.stringify(DATA)); } catch (e) {}
   DATA.supps = DATA.supps || defaultSupps();
   DATA.settings = DATA.settings || { cycleLen: 28 };
@@ -698,16 +730,22 @@ function recentFoods() {
   for (let i = 0; i < 45; i++) (getDay(addDays(t, -i)).foods || []).forEach(f => cnt[f.name] = (cnt[f.name] || 0) + 1);
   return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]).slice(0, 12);
 }
+function qtyPicker(q, unit, actQ, actU, inp) {
+  return `<div class="wrap">${AMOUNTS.map(a => chip(a, q === a, actQ, a)).join('')}
+      <input class="input" type="text" inputmode="text" style="width:96px;min-height:40px;background:#fff" placeholder="אחר / 5-7" value="${esc(q && !AMOUNTS.includes(q) ? q : '')}" data-input="${inp}" aria-label="כמות אחרת או טווח"></div>
+    <div class="wrap" style="margin-top:6px">${UNITS.map(u => chip(u[0], unit === u[0], actU, u[0])).join('')}</div>`;
+}
 function foodCard(s) {
   const d = getDay(s);
   const groups = SLOTS.filter(sl => d.foods.some(f => f.slot === sl)).map(sl => `
     <div style="padding:8px 0;border-bottom:1px solid var(--line2)">
       <div class="small" style="font-weight:700;color:var(--accent);margin-bottom:4px">${sl}</div>
-      <div class="wrap">${d.foods.map((f, i) => f.slot === sl ? `<span class="row" style="gap:2px;background:var(--bg);border-radius:16px;padding:2px 4px 2px 10px;font-size:14px">${f.t ? `<span class="xs" style="font-weight:700;color:var(--accent)">${esc(f.t)}</span> ` : ''}<button type="button" style="background:none;border:none;padding:4px 0;font-size:14px;text-align:right" data-act="foodEdit" data-a="${i}" aria-label="עריכת ${esc(f.name)}">${esc(f.name)}${f.prep ? ` <span class="xs muted">(${esc(f.prep)})</span>` : ' <span class="xs" style="color:#A3324A">(הכנה?)</span>'}</button><button class="iconbtn" style="width:32px;height:32px;color:var(--muted)" aria-label="הסרת ${esc(f.name)}" data-act="rmFood" data-a="${i}">${ICON.x}</button></span>` : '').join('')}</div>
+      <div class="wrap">${d.foods.map((f, i) => f.slot === sl ? `<span class="row" style="gap:2px;background:var(--bg);border-radius:16px;padding:2px 4px 2px 10px;font-size:14px">${f.t ? `<span class="xs" style="font-weight:700;color:var(--accent)">${esc(f.t)}</span> ` : ''}<button type="button" style="background:none;border:none;padding:4px 0;font-size:14px;text-align:right" data-act="foodEdit" data-a="${i}" aria-label="עריכת ${esc(f.name)}">${qtyText(f) ? `<b>${esc(qtyText(f))}</b> ` : ''}${esc(f.name)}${f.prep ? ` <span class="xs muted">(${esc(f.prep)})</span>` : ' <span class="xs" style="color:#A3324A">(הכנה?)</span>'}</button><button class="iconbtn" style="width:32px;height:32px;color:var(--muted)" aria-label="הסרת ${esc(f.name)}" data-act="rmFood" data-a="${i}">${ICON.x}</button></span>` : '').join('')}</div>
       ${S.foodEdit != null && d.foods[S.foodEdit] && d.foods[S.foodEdit].slot === sl ? (() => { const f = d.foods[S.foodEdit]; return `<div style="margin-top:8px;padding:10px;border-radius:12px;background:#fff;border:1px solid #D9CCE4">
         <div class="small" style="font-weight:700;margin-bottom:6px">${esc(f.name)}</div>
         <div class="wrap">${PREP.map(x => chip(x, f.prep === x, 'fPrep', x)).join('')}</div>
-        <div class="row" style="margin-top:8px;gap:8px"><label class="small muted" for="fT">שעה</label><input id="fT" type="time" class="input" style="width:120px;min-height:40px" value="${esc(f.t || '')}" data-input="fT">
+        <div class="small muted" style="margin-top:8px">כמה?</div>${qtyPicker(f.qty != null ? String(f.qty) : (f.amt ? String(f.amt) : ''), f.unit || '', 'fQty', 'fUnit', 'fQtyX')}
+        <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><label class="small muted" for="fT">שעה</label><input id="fT" type="time" class="input" style="width:120px;min-height:40px" value="${esc(f.t || '')}" data-input="fT">
           <button class="chip" data-act="foodEditDone">סגירה</button></div></div>`; })() : ''}
     </div>`).join('');
   const p = S.pending;
@@ -715,10 +753,12 @@ function foodCard(s) {
   return `<div>
     <div class="small muted" style="margin-bottom:4px">אפשר לפרט לפי ארוחות, או לרשום הכל בסוף היום</div>
     <div class="lbl">מתי?</div>${chips(SLOTS, x => S.slot === x, 'slot')}
-    <div class="row" style="margin-top:8px;gap:8px"><label class="small muted" for="foodTime">שעה (לא חובה)</label>
+    <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><label class="small muted" for="foodTime">שעה (לא חובה)</label>
       <input id="foodTime" type="time" class="input" style="width:120px;min-height:40px" value="${esc(S.foodTime || '')}" data-input="foodTime">
       ${S.day === todayS() ? `<button class="chip" style="min-height:36px" data-act="foodNow">עכשיו</button>` : ''}${S.foodTime ? `<button class="chip" style="min-height:36px" data-act="foodTimeClear">ניקוי</button>` : ''}</div>
     <div class="lbl">הכנה</div><div class="wrap">${chip('אוטומטי', !S.prepTouched, 'prep', 'auto')}${PREP.map(x => chip(x, S.prepTouched && S.prep === x, 'prep', x)).join('')}</div>
+    <div class="lbl">כמה? (לא חובה)</div>${qtyPicker(S.foodQty || '', S.foodUnit != null ? S.foodUnit : '', 'foodQty', 'foodUnit', 'foodQtyX')}
+    <div class="xs muted" style="margin-top:4px">אפשר גם טווח או הערכה, למשל 5-7 כפות או חופן. כך כל מאכל נשמר בשם אחד, והכמות בנפרד.${S.foodUnit == null ? ' היחידה נבחרת אוטומטית לפי הפעם הקודמת.' : ''}</div>
     <div class="xs muted" style="margin-top:4px">${S.prepTouched ? 'ייקבע רק לפריט הבא, ואז חוזר לאוטומטי.' : 'כל מאכל יקבל את ההכנה שבחרת לו בפעם הקודמת. למאכל חדש תישאלי.'}</div>
     <label class="lbl" for="foodIn" style="display:block">מה אכלת?</label>
     <div class="row">
@@ -835,7 +875,7 @@ function compToEntry(c) {
    ===================================================================== */
 const FOOD_DICT = (() => {
   const G = 'gluten', D = 'dairy', E = 'eggs', SU = 'sugar', CA = 'caffeine', F = 'fried', LE = 'legumes', O = 'onion',
-    SP = 'spicy', AL = 'alcohol', SA = 'salty', V = 'veg', FR = 'fruit', P = 'processed';
+    SP = 'spicy', AL = 'alcohol', SA = 'salty', V = 'veg', FR = 'fruit', P = 'processed', DR = 'dried';
   const d = {};
   const add = (cats, names) => names.split('|').forEach(n => d[n] = cats);
   const also = (cat, names) => names.split('|').forEach(n => { d[n] = (d[n] || []).filter(c => c !== cat).concat([cat]); });
@@ -855,7 +895,7 @@ const FOOD_DICT = (() => {
   add([E, V, O], 'שקשוקה|פריטטה|חביתת ירק');
   add([E, D], 'קיש|פשטידה|חביתה עם גבינה');
   // sweets
-  add([SU], 'שוקולד|שוקולד מריר|שוקולד חלב|ממתקים|סוכריות|סוכר|דבש|ריבה|ממרח שוקולד|נוטלה|חלבה|תמרים|סילאן|מרשמלו|קרמבו|במבה נוגט|גומי|סורבה|ארטיק');
+  add([SU], 'שוקולד|שוקולד מריר|שוקולד חלב|ממתקים|סוכריות|סוכר|דבש|ריבה|ממרח שוקולד|נוטלה|חלבה|סילאן|מרשמלו|קרמבו|במבה נוגט|גומי|סורבה|ארטיק');
   add([SU, D], 'שוקולד חלב');
   // caffeine
   add([CA], 'קפה|אספרסו|קפה שחור|תה|תה ירוק|קולה|קוקה קולה|משקה אנרגיה|מאצ׳ה|קפה קר|אייס קפה|ארל גריי');
@@ -885,7 +925,7 @@ const FOOD_DICT = (() => {
   add([V, LE], 'אדממה|שעועית ירוקה|אפונה');
   // fruit
   add([FR], 'פרי|פירות|תפוח|בננה|תפוז|קלמנטינה|אגס|ענבים|תותים|אבטיח|מלון|מנגו|אננס|קיווי|אפרסק|נקטרינה|שזיף|אוכמניות|פטל|דובדבנים|רימון|אפרסמון|ליצ׳י|פומלה|אשכולית|לימון|תאנים|משמש|סלט פירות');
-  add([FR, SU], 'פירות יבשים|צימוקים|משמש מיובש|מנגו מיובש|תמרים');
+  add([FR, DR], 'פירות יבשים|פירות מיובשים|צימוקים|משמש מיובש|מנגו מיובש|תמרים|תמר|שזיפים מיובשים|תאנים מיובשות|גוג׳י|גוג\'י|אננס מיובש|תפוח מיובש|בננה מיובשת');
   // mixed dishes
   add([G, V, O], 'פסטה ברוטב עגבניות|ספגטי ברוטב|פסטה ברוטב');
   add([G, D, E], 'פנקייק|וופל בלגי|פרנץ׳ טוסט|קרפ מתוק');
@@ -902,6 +942,8 @@ const FOOD_DICT = (() => {
   add([LE], 'חמאת בוטנים');
   add([G, E, F, V, LE], 'סביח');
   // carbohydrates / starches (on top of any other group)
+  // cranberries are almost always sold sweetened (sugar or apple juice concentrate)
+  add([FR, DR, SU], 'חמוציות|חמוציות מיובשות');
   const CB = 'carbs';
   add([CB], 'אורז|אורז לבן|אורז מלא|אורז בסמטי|אורז יסמין|אורז פרסי|סושי|נודלס אורז|אטריות אורז|קינואה|כוסמת|תפוח אדמה|תפוחי אדמה|פירה|בטטה|תירס|פולנטה|פריכיות אורז|דוחן|גריסים|כוסמין|קסאווה|ניוקי תפוחי אדמה|תפוחי אדמה אפויים');
   also(CB, 'לחם|לחם מחמצת|לחם מלא|לחם לבן|פיתה|לאפה|בגט|חלה|טוסט|לחמניה|לחמנייה|בייגל|מצה|טורטייה|טורטיה|פתיתים|קוסקוס|בורגול|פסטה|ספגטי|ניוקי|אטריות|נודלס|לזניה|פיצה|כופתאות|רביולי|שיבולת שועל|דייסת שיבולת שועל|גרנולה|דגני בוקר|פנקייק|וופל|קרקרים|פריכיות|צ׳יפס|טוגנים|לביבות|מג׳דרה|טוסט גבינה|פסטה ברוטב עגבניות|ספגטי ברוטב|פסטה ברוטב|פסטה ברוטב שמנת|בורקס|ג׳חנון|מלאווח|סביח|פלאפל בפיתה|תפוצ׳יפס|בייגלה');
@@ -933,6 +975,13 @@ function guessFoodCats(name) {
   const found = Object.keys(FOOD_DICT).filter(k => k.length >= 3 && hasWord(k));
   found.filter(k => k !== n && !found.some(o => o !== k && o.includes(k))).forEach(k => { FOOD_DICT[k].forEach(c => set.add(c)); hit = true; });
   FOOD_HINTS.forEach(([re, c]) => { if (re.test(n)) { set.add(c); hit = true; } });
+  // salty / pickled / brined
+  if (/(?<!שמן )זית|חמוצים|חמוץ(?![א-ת])|כבוש|מלפפון חמוץ|כרוב כבוש|קימצ׳י|קימצי|רוטב סויה|מיסו|פטה|בולגרית|חלומי|פרמז|גבינה צהובה|צהובה|מלוח|במבה|ביסלי|צ׳יפס|ציפס|תפוצ׳יפס|בייגלה|פרינגלס|דוריטוס|קרקר|אנשובי|טונה|נקניק|פסטרמה|סלמי|קבנוס|ממרח זיתים|טפנד|צלפים|רוטב פיצה|קטשופ|אבקת מרק|מנה חמה|אטריות אינסטנט/.test(n)) { set.add('salt'); hit = true; }
+  // high in dietary fiber: legumes, whole grains, bran, seeds and some fruit / veg
+  if (/עדש|חומוס|גרגירי|שעועית|אפונה|אדממה|טמפה|(?:^|\s)מלא(?:ה|ים|ות)?(?:\s|$)|כוסמין|כוסמת|קינואה|שיבולת שועל|גרנולה|מוזלי|ברנפלקס|סובין|פשתן|צ׳יה|צ'יה|זרעי|אגוזים|שקדים|פירות יבשים|תמרים|שזיף|אגס|תפוח(?!י? אדמה)|פטל|אוכמניות|תותים|אבוקדו|ברוקולי|כרובית|כרוב|ארטישוק|בטטה|גזר|חציל|תרד|קייל|סלק|פטריות|בורגול|פריקה|מג׳דרה|פלאפל/.test(n) || (set.has('legumes') && !/טופו|סויה|מיסו/.test(n))) { if (!/^(חלב|משקה)\s/.test(n) && !/^(טופו|רוטב סויה)/.test(n)) { set.add('fiber'); hit = true; } }
+  // dried fruit: its own group (sugar only if sweetened)
+  if (/מיובש|פירות יבשים|צימוק|(?:^|\s)תמר(?:ים)?(?:\s|$)|חמוציות|גוג׳י|גוג'י/.test(n)) { set.add('dried'); set.add('fruit'); hit = true; }
+  if (set.has('dried') && /ללא (תוספת )?סוכר|בלי (תוספת )?סוכר|לא ממותק/.test(n)) set.delete('sugar');
   // protein-enriched products
   if (/חלבון|פרוטאין|protein|high pro|פרו /i.test(n)) { set.add('protein'); hit = true; }
   // oil / fat: fried or sautéed, sauces, dressings, spreads
@@ -1753,7 +1802,10 @@ function addFoodName(name) {
   const d = editDay(S.day);
   // prep: chosen for this item, else the one this food had last time, else ask (new food card)
   const prep = S.prepTouched ? S.prep : lastPrepOf(name);
-  const item = { name, slot: S.slot, prep: prep || '' }; if (S.foodTime) item.t = S.foodTime;
+  const item = { name, slot: S.slot, prep: prep || '' }; if (S.foodTime) item.t = S.foodTime; if (S.foodQty) { item.qty = S.foodQty; const v = qtyNum(S.foodQty); if (v != null) item.qn = v; }
+  const unit = S.foodUnit != null ? S.foodUnit : ((DATA.foodLib[name] || {}).lastUnit || '');
+  if (unit && (S.foodQty || S.foodUnit != null)) item.unit = unit;
+  if (S.foodUnit && DATA.foodLib[name]) DATA.foodLib[name].lastUnit = S.foodUnit;
   d.foods.push(item);
   if (prep && DATA.foodLib[name]) DATA.foodLib[name].lastPrep = prep;
   if (!DATA.foodLib[name]) {
@@ -1762,7 +1814,8 @@ function addFoodName(name) {
     if (prep) DATA.foodLib[name].lastPrep = prep;
     S.pending = { name, cats: g.cats.slice(), guessed: g.guessed, prep: prep || '', idx: d.foods.length - 1 };
   }
-  S.prepTouched = false;
+  if (S.foodUnit && DATA.foodLib[name]) DATA.foodLib[name].lastUnit = S.foodUnit;
+  S.prepTouched = false; S.foodQty = ''; S.foodUnit = null;
   save();
 }
 
@@ -1796,6 +1849,10 @@ const ACT = {
   slot: a => { S.slot = a; render(); },
   prep: a => { if (a === 'auto') S.prepTouched = false; else { S.prep = a; S.prepTouched = true; } render(); },
   pPrep: a => { const p = S.pending; p.prep = a; const f = editDay(S.day).foods[p.idx]; if (f && f.name === p.name) f.prep = a; DATA.foodLib[p.name].lastPrep = a; save(); render(); },
+  foodQty: a => { S.foodQty = S.foodQty === a ? '' : a; render(); },
+  foodUnit: a => { S.foodUnit = S.foodUnit === a ? '' : a; render(); },
+  fQty: a => { const f = editDay(S.day).foods[S.foodEdit]; if (!f) return; delete f.amt; if (f.qty === a) { delete f.qty; delete f.qn; } else { f.qty = a; f.qn = qtyNum(a); } save(); render(); },
+  fUnit: a => { const f = editDay(S.day).foods[S.foodEdit]; if (!f) return; if (f.unit === a) delete f.unit; else { f.unit = a; if (DATA.foodLib[f.name]) DATA.foodLib[f.name].lastUnit = a; } save(); render(); },
   foodEdit: a => { S.foodEdit = S.foodEdit === Number(a) ? null : Number(a); render(); },
   foodEditDone: () => { S.foodEdit = null; render(); },
   fPrep: a => { const f = editDay(S.day).foods[S.foodEdit]; if (!f) return; f.prep = a; if (DATA.foodLib[f.name]) DATA.foodLib[f.name].lastPrep = a; save(); render(); },
@@ -1890,6 +1947,8 @@ document.addEventListener('input', e => {
   else if (k === 'cTemp') S.comp.temp = el.value;
   else if (k === 'foodDraft') S.foodDraft = el.value;
   else if (k === 'foodTime') S.foodTime = el.value;
+  else if (k === 'foodQtyX') S.foodQty = el.value.trim();
+  else if (k === 'fQtyX') { const f = editDay(S.day).foods[S.foodEdit]; if (f) { delete f.amt; const v = el.value.trim(); if (v) { f.qty = v; f.qn = qtyNum(v); } else { delete f.qty; delete f.qn; } save(); } }
   else if (k === 'fT') { const f = editDay(S.day).foods[S.foodEdit]; if (f) { if (el.value) f.t = el.value; else delete f.t; save(); } }
   else if (k === 'craveAt') { const d = editDay(S.day); d.craveT = d.craveT || {}; d.craveT[el.dataset.a] = el.value || true; save(); }
   else if (k === 'sleepNote') { editDay(S.day).sleepNote = el.value; save(); }
