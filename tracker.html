@@ -109,7 +109,7 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
-const APP_VERSION = '16.11ג';
+const APP_VERSION = '16.11ד';
 const AMOUNTS = ['½', '1', '1½', '2', '3'];
 // units: [singular, plural]
 const UNITS = [['יחידה', 'יחידות'], ['גרם', 'גרם'], ['קובייה', 'קוביות'], ['פרוסה', 'פרוסות'], ['כף', 'כפות'], ['כפית', 'כפיות'], ['כוס', 'כוסות'],
@@ -760,6 +760,9 @@ function foodEditor(f, i) {
   const total = itemCats(f);
   return `<div style="margin-top:8px;padding:12px;border-radius:12px;background:#fff;border:1px solid #D9CCE4">
     <div class="between"><div style="font-weight:700">${esc(f.name)}</div>${isNew ? '<span class="xs" style="font-weight:700;color:#8A6A12;background:#FBF5E6;border-radius:10px;padding:2px 8px">חדש בספרייה</span>' : ''}</div>
+    ${itemNutLine(f)}
+    <button class="chip" style="margin-top:6px;min-height:34px;font-size:13px" data-act="nutEd" data-a="${esc(f.name)}">${S.nutEd === f.name ? 'סגירת הערכים' : 'ערכים תזונתיים'}</button>
+    ${S.nutEd === f.name ? nutEditorHtml(f.name, [f.unit]) : ''}
     <div class="lbl" style="margin-top:6px">מאיפה?</div><div class="wrap">${PREP.map(x => chip(x, f.prep === x, 'fPrep', x)).join('')}</div>
     <div class="lbl">איך הוכן? <span class="muted" style="font-weight:400">(לא חובה)</span></div><div class="wrap">${METHODS.map(x => chip(x, f.method === x, 'fMethod', x)).join('')}</div>
     <div class="lbl">${parts.length ? 'כמה מהמנה כולה?' : 'כמה?'} <span class="muted" style="font-weight:400">(${parts.length ? 'למשל קערה אחת · את הכמות של כל מרכיב מגדירים למטה · ' : ''}לא חובה)</span></div>${qtyPicker(f.qty != null ? String(f.qty) : (f.amt ? String(f.amt) : ''), f.unit || '', 'fQty', 'fUnit', 'fQtyX')}
@@ -769,7 +772,8 @@ function foodEditor(f, i) {
       <div class="small" style="font-weight:700">כמה ${esc(pe.name)}?</div>${qtyPicker(pe.qty != null ? String(pe.qty) : '', pe.unit || '', 'pQty', 'pUnit', 'pQtyX')}
       <div class="small muted" style="margin-top:8px">קבוצות של ${esc(pe.name)}</div>
       <div class="wrap">${FOOD_CATS.map(c => chip(c[1], ((DATA.foodLib[pe.name] || {}).cats || []).includes(c[0]), 'partCat', c[0])).join('')}</div>
-      <button class="chip" style="margin-top:8px" data-act="partEdit" data-a="${S.partEdit}">סגירת המרכיב</button></div>` : ''}
+      <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="chip" data-act="partEdit" data-a="${S.partEdit}">סגירת המרכיב</button><button class="chip" style="font-size:13px" data-act="nutEd" data-a="${esc(pe.name)}">${S.nutEd === pe.name ? 'סגירת הערכים' : 'ערכים תזונתיים' + (hasNut(pe.name) ? '' : ' (חסר)')}</button></div>
+      ${S.nutEd === pe.name ? nutEditorHtml(pe.name, [pe.unit]) : ''}</div>` : ''}
     <div class="row" style="margin-top:8px"><input id="partIn" class="input" list="foodList" placeholder="${parts.length ? 'עוד מרכיב' : 'לדוגמה: טופו'}" autocomplete="off" enterkeyhint="done" data-enter="addPart" data-input="partDraft" value="${esc(S.partDraft || '')}">
       <button class="btn ghost" style="flex:0 0 auto" data-act="addPart">+ מרכיב</button></div>
     <div class="xs muted" style="margin-top:4px">${parts.length ? 'לחיצה על מרכיב ברשימה פותחת את הכמות שלו.' : 'כותבים מרכיב ולוחצים "+ מרכיב". אז נפתחת בחירת הכמות שלו.'}</div>
@@ -793,6 +797,7 @@ function foodCard(s) {
     </div>`).join('');
   const recent = recentFoods();
   return `<div>
+    ${nutSummaryHtml(d)}
     <div class="small muted" style="margin-bottom:4px">אפשר לפרט לפי ארוחות, או לרשום הכל בסוף היום</div>
     <div class="lbl">מתי?</div>${chips(SLOTS, x => S.slot === x, 'slot')}
     <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><label class="small muted" for="foodTime">שעה (לא חובה)</label>
@@ -1612,6 +1617,131 @@ Object.assign(ACT_EXTRA, {
 });
 
 /* =====================================================================
+   Nutrition estimates — values per 100 g in the food library + grams per unit
+   lib.nut = {kcal, p, c, f, fib} per 100 g · lib.g = {unit: grams, 'מנה': typical portion}
+   lib.nutSrc = 'user' (typed by her, never overwritten by an import) | 'est'
+   ===================================================================== */
+const NUT_KEYS = [['kcal', 'קלוריות', 'קק״ל'], ['p', 'חלבון', 'ג׳'], ['c', 'פחמימה', 'ג׳'], ['f', 'שומן', 'ג׳'], ['fib', 'סיבים', 'ג׳']];
+// rough fallback only when a food has no grams for that unit (wider uncertainty)
+const UNIT_G_FALLBACK = { 'כף': 15, 'כפית': 5, 'כוס': 200, 'חופן': 30, 'קערה': 300, 'מנה': 250, 'פרוסה': 30, 'קובייה': 10 };
+const METHOD_OIL_G = { 'מוקפץ': 10, 'מטוגן': 20 };
+const OIL_100 = { kcal: 884, p: 0, c: 0, f: 100, fib: 0 };
+
+function hasNut(name) { const l = DATA.foodLib[name]; return !!(l && l.nut && l.nut.kcal != null); }
+// grams eaten of one food (or one ingredient) + how unsure that amount is (0.1 = ±10%)
+function gramsOf(name, o) {
+  const lib = DATA.foodLib[name] || {}; const g = lib.g || {};
+  let n = o.qn != null ? o.qn : (o.qty != null ? qtyNum(o.qty) : (o.amt != null ? o.amt : null));
+  const hasQty = n != null; if (!hasQty) n = 1;
+  let grams = null, unc = 0;
+  if (o.unit === 'גרם') { grams = n; unc = 0.1; }
+  else if (o.unit && g[o.unit]) { grams = n * g[o.unit]; unc = 0.2; }
+  else if (!o.unit && g['מנה']) { grams = n * g['מנה']; unc = 0.35; }
+  else if (!o.unit && g['יחידה']) { grams = n * g['יחידה']; unc = 0.25; }
+  else if (o.unit && UNIT_G_FALLBACK[o.unit]) { grams = n * UNIT_G_FALLBACK[o.unit]; unc = 0.35; }
+  if (grams == null) return null;
+  if (!hasQty) unc = Math.max(unc, 0.5);
+  return { g: grams, unc };
+}
+function scaleNut(nut, grams) { const o = {}; NUT_KEYS.forEach(([k]) => { o[k] = (Number(nut[k]) || 0) * grams / 100; }); return o; }
+// estimate for one eaten item: {v, unc, partial, missing:[names]} or null
+function itemNut(f) {
+  const lib = DATA.foodLib[f.name] || {};
+  const parts = f.parts || [];
+  const partsQ = parts.filter(p => p.qty != null || p.qn != null);
+  // the dish as a whole: when it has its own values and no measured ingredients (e.g. a bowl eaten out)
+  if (hasNut(f.name) && (!parts.length || !partsQ.length || (f.qty != null && !partsQ.length))) {
+    const gr = gramsOf(f.name, f); if (!gr) return { v: null, missing: [f.name + ' (אין גרמים ליחידה)'] };
+    return { v: scaleNut(lib.nut, gr.g), unc: gr.unc, partial: false, missing: [] };
+  }
+  if (!parts.length) return { v: null, missing: [f.name] };
+  const v = {}; NUT_KEYS.forEach(([k]) => { v[k] = 0; });
+  let w = 0, uncSum = 0, got = 0; const missing = [];
+  parts.forEach(p => {
+    if (!hasNut(p.name)) { missing.push(p.name); return; }
+    const gr = gramsOf(p.name, p); if (!gr) { missing.push(p.name); return; }
+    const pv = scaleNut(DATA.foodLib[p.name].nut, gr.g);
+    NUT_KEYS.forEach(([k]) => { v[k] += pv[k]; }); w += pv.kcal; uncSum += pv.kcal * gr.unc; got++;
+  });
+  if (!got) return { v: null, missing };
+  // cooking oil, unless oil is already listed as an ingredient
+  const oilG = METHOD_OIL_G[f.method];
+  if (oilG && !parts.some(p => ((DATA.foodLib[p.name] || {}).cats || []).includes('oil') && /שמן|חמאה/.test(p.name))) {
+    const ov = scaleNut(OIL_100, oilG); NUT_KEYS.forEach(([k]) => { v[k] += ov[k]; }); w += ov.kcal; uncSum += ov.kcal * 0.6;
+  }
+  return { v, unc: w ? uncSum / w : 0.3, partial: missing.length > 0, missing };
+}
+function dayNut(d) {
+  const lo = {}, hi = {}, mid = {}; NUT_KEYS.forEach(([k]) => { lo[k] = hi[k] = mid[k] = 0; });
+  let n = 0; const missing = [];
+  (d.foods || []).forEach(f => {
+    const r = itemNut(f);
+    if (r && r.v) { n++; NUT_KEYS.forEach(([k]) => { mid[k] += r.v[k]; lo[k] += r.v[k] * (1 - r.unc); hi[k] += r.v[k] * (1 + r.unc); }); }
+    if (r && r.missing.length) missing.push(...r.missing);
+  });
+  return { lo, hi, mid, n, total: (d.foods || []).length, missing: [...new Set(missing)] };
+}
+const fmtN = v => Math.round(v).toLocaleString('en-US');
+function fmtRange(lo, hi, k) {
+  const r = k === 'kcal' ? (x => Math.round(x / 10) * 10) : Math.round;
+  const a = r(lo), b = r(hi);
+  return a === b ? fmtN(a) : '<span dir="ltr" style="unicode-bidi:isolate">' + fmtN(a) + '–' + fmtN(b) + '</span>';
+}
+function nutTargets() { return (DATA.settings && DATA.settings.nutTarget) || {}; }
+// the running total shown at the top of the day's food card
+function nutSummaryHtml(d) {
+  const anyLib = Object.keys(DATA.foodLib).some(hasNut);
+  if (!anyLib) return `<div class="xs muted" style="margin-bottom:8px;padding:8px 10px;border-radius:10px;background:var(--bg)">הערכת קלוריות: עוד אין ערכים תזונתיים בספרייה. אפשר למלא בהגדרות ← תזונה.</div>`;
+  if (!(d.foods || []).length) return '';
+  const s = dayNut(d); const T = nutTargets();
+  if (!s.n) return `<div class="xs muted" style="margin-bottom:8px;padding:8px 10px;border-radius:10px;background:var(--bg)">אין עדיין ערכים לאף פריט היום${s.missing.length ? ' (חסרים: ' + esc(s.missing.join(', ')) + ')' : ''}.</div>`;
+  const rem = k => { const t = Number(T[k]); if (!t) return ''; const a = t - s.hi[k], b = t - s.lo[k];
+    if (b <= 0) return `עברת את היעד בערך ב-${fmtRange(-b, -a, k)}`;
+    return `נשאר בערך ${fmtRange(Math.max(0, a), b, k)} מתוך ${fmtN(t)}`; };
+  return `<div style="margin-bottom:10px;padding:10px 12px;border-radius:12px;background:#F6F0FA">
+    <div class="xs muted">היום עד עכשיו (הערכה)</div>
+    <div style="font-weight:700;font-size:18px">${fmtRange(s.lo.kcal, s.hi.kcal, 'kcal')} קק״ל</div>
+    ${rem('kcal') ? `<div class="small" style="color:var(--accent);font-weight:700">${rem('kcal')}</div>` : ''}
+    <div class="small" style="margin-top:4px">${NUT_KEYS.slice(1).map(([k, l, u]) => `${l} ${fmtRange(s.lo[k], s.hi[k], k)} ${u}${T[k] ? ` <span class="muted">(${rem(k).replace('נשאר בערך ', 'נשאר ').replace(/ מתוך .*/, '')})</span>` : ''}`).join(' · ')}</div>
+    <div class="xs muted" style="margin-top:4px">${s.n} מתוך ${s.total} פריטים עם ערכים${s.missing.length ? ' · חסרים: ' + esc(s.missing.join(', ')) : ''}</div>
+  </div>`;
+}
+// editing the values of one food (inside the item card or in the library)
+function nutEditorHtml(name, units) {
+  const lib = DATA.foodLib[name] || {}; const nut = lib.nut || {}; const g = lib.g || {};
+  const us = [...new Set((units || []).filter(u => u && u !== 'גרם').concat(Object.keys(g)).concat(['מנה']))];
+  const inp = (attr, a, v, w) => `<input class="input" type="number" inputmode="decimal" min="0" style="width:${w || 80}px;min-height:38px" data-input="${attr}" data-a="${esc(a)}" value="${v != null ? esc(String(v)) : ''}">`;
+  return `<div style="margin-top:8px;padding:10px;border-radius:10px;background:var(--bg)">
+    <div class="small" style="font-weight:700">ערכים ל-100 גרם של ${esc(name)}</div>
+    <div class="xs muted">אפשר להעתיק מהתווית. ערך שתקלידי לא יוחלף בייבוא.</div>
+    <div class="wrap" style="margin-top:6px;gap:8px">${NUT_KEYS.map(([k, l]) => `<label class="small" style="display:flex;flex-direction:column;gap:2px">${l}${inp('nut', name + '::' + k, nut[k])}</label>`).join('')}</div>
+    <div class="small" style="font-weight:700;margin-top:10px">כמה גרם שוקלת יחידה?</div>
+    <div class="wrap" style="margin-top:6px;gap:8px">${us.map(u => `<label class="small" style="display:flex;flex-direction:column;gap:2px">${u === 'מנה' ? 'מנה רגילה' : esc(u)}${inp('ng', name + '::' + u, g[u], 72)}</label>`).join('')}</div>
+    ${lib.nutSrc === 'est' ? '<div class="xs muted" style="margin-top:6px">הערכים כאן הם הערכה שלי. אפשר לתקן.</div>' : ''}
+  </div>`;
+}
+function itemNutLine(f) {
+  const r = itemNut(f);
+  if (r && r.v) return `<div class="xs muted" style="margin-top:4px">בערך ${fmtRange(r.v.kcal * (1 - r.unc), r.v.kcal * (1 + r.unc), 'kcal')} קק״ל · חלבון ${fmtRange(r.v.p * (1 - r.unc), r.v.p * (1 + r.unc), 'p')} ג׳${r.partial ? ' · בלי: ' + esc(r.missing.join(', ')) : ''}</div>`;
+  return `<div class="xs muted" style="margin-top:4px">אין עדיין ערכים תזונתיים${r && r.missing.length ? ' ל: ' + esc(r.missing.join(', ')) : ''}</div>`;
+}
+// importing the values file I prepare: {app:'tracker-nutrition', foods:{name:{nut, g}}}
+function importNutrition(obj) {
+  let upd = 0, kept = 0, added = 0;
+  Object.entries(obj.foods || {}).forEach(([name, v]) => {
+    let lib = DATA.foodLib[name];
+    if (!lib) { lib = DATA.foodLib[name] = { cats: guessFoodCats(name).cats, confirmed: false }; added++; }
+    // grams she typed herself stay
+    const gs = lib.gSrc || {}; lib.g = lib.g || {};
+    Object.entries(v.g || {}).forEach(([u, x]) => { if (!gs[u]) lib.g[u] = x; });
+    if (lib.nutSrc === 'user') { kept++; return; }
+    if (v.nut) { lib.nut = v.nut; lib.nutSrc = 'est'; }
+    upd++;
+  });
+  return { upd, kept, added };
+}
+
+/* =====================================================================
    Charts
    ===================================================================== */
 S.range = 30;
@@ -1793,8 +1923,15 @@ function renderSettings() {
     <section class="card"><details ${S.libOpen ? 'open' : ''} data-act="libToggle"><summary class="between"><h2 style="margin:0">ספריית המאכלים שלי</h2><span class="small muted">${lib.length} פריטים</span></summary>
       <div class="xs muted" style="margin:6px 0">הקבוצות של כל מאכל משמשות לזיהוי דפוסים. אפשר לתקן כאן בכל רגע.</div>
       ${lib.map(n => `<div style="padding:10px 0;border-top:1px solid var(--line2)"><div class="between"><b>${esc(n)}</b><button class="iconbtn" style="width:36px;height:36px;color:var(--muted)" aria-label="מחיקת ${esc(n)} מהספרייה" data-act="libDel" data-a="${esc(n)}">${ICON.x}</button></div>
-        <div class="wrap" style="margin-top:6px">${FOOD_CATS.map(c => `<button type="button" class="chip" style="min-height:34px;font-size:13px;padding:0 10px" aria-pressed="${DATA.foodLib[n].cats.includes(c[0])}" data-act="libCat" data-a="${esc(n)}::${c[0]}">${c[1]}</button>`).join('')}</div></div>`).join('') || '<div class="small muted">עוד אין מאכלים. הם יתווספו כאן כשתזיני אוכל.</div>'}
+        <div class="wrap" style="margin-top:6px">${FOOD_CATS.map(c => `<button type="button" class="chip" style="min-height:34px;font-size:13px;padding:0 10px" aria-pressed="${DATA.foodLib[n].cats.includes(c[0])}" data-act="libCat" data-a="${esc(n)}::${c[0]}">${c[1]}</button>`).join('')}</div>
+        <button class="chip" style="margin-top:6px;min-height:32px;font-size:13px" data-act="nutEd" data-a="${esc(n)}">${hasNut(n) ? fmtN(DATA.foodLib[n].nut.kcal) + ' קק״ל ל-100 ג׳ · עריכה' : 'אין ערכים תזונתיים · הוספה'}</button>
+        ${S.nutEd === n ? nutEditorHtml(n, [DATA.foodLib[n].lastUnit]) : ''}</div>`).join('') || '<div class="small muted">עוד אין מאכלים. הם יתווספו כאן כשתזיני אוכל.</div>'}
     </details></section>
+    <section class="card"><h2>תזונה (הערכה)</h2>
+      <div class="small muted">${lib.filter(hasNut).length} מתוך ${lib.length} מאכלים בספרייה עם ערכים. את הערכים של כל מאכל אפשר לראות ולתקן בספריית המאכלים או בכרטיס הפריט.</div>
+      <label class="btn soft block" style="display:flex;align-items:center;justify-content:center;margin-top:10px">ייבוא קובץ ערכים תזונתיים<input type="file" accept="application/json,.json" style="display:none" data-change="importNut"></label>
+      <div class="lbl">יעד יומי <span class="muted" style="font-weight:400">(לא חובה · כדי לראות כמה נשאר)</span></div>
+      <div class="wrap" style="gap:8px">${NUT_KEYS.map(([k, l, u]) => `<label class="small" style="display:flex;flex-direction:column;gap:2px">${l} (${u})<input class="input" type="number" inputmode="numeric" min="0" style="width:90px;min-height:38px" data-input="nutT" data-a="${k}" value="${nutTargets()[k] != null ? nutTargets()[k] : ''}"></label>`).join('')}</div></section>
     <section class="card"><h2>מחזור</h2><label class="small muted" for="cycLen">אורך מחזור משוער (עד שיצטברו נתונים)</label>
       <div class="row" style="margin-top:6px"><input id="cycLen" class="input" style="width:100px" type="number" min="18" max="50" value="${DATA.settings.cycleLen || 28}" data-input="cycLen"><span class="small muted">ימים · מחושב בפועל: ${cycleInfo().n >= 2 ? cycleInfo().len + ' ימים' : 'עוד אין מספיק מחזורים'}</span></div></section>
     <section class="card"><h2>מתי מתחיל יום חדש</h2><div class="small muted">רישום אחרי חצות ועד השעה הזו שייך ליום הקודם (הלילה שבסופו). "פתיחת היום" וכפתורי "עכשיו" פותחים אותו.</div>
@@ -1886,6 +2023,7 @@ const ACT = {
   fMethod: a => { const f = curFood(); if (!f) return; if (f.method === a) delete f.method; else f.method = a; save(); render(); },
   fQty: a => { const f = curFood(); if (!f) return; setQty(f, f.qty === a ? '' : a); save(); render(); },
   fUnit: a => { const f = curFood(); if (!f) return; if (f.unit === a) delete f.unit; else { f.unit = a; if (DATA.foodLib[f.name]) DATA.foodLib[f.name].lastUnit = a; } save(); render(); },
+  nutEd: a => { S.nutEd = S.nutEd === a ? null : a; if (S.view === 'settings' || !S.day) S.libOpen = true; render(); },
   fCatsOpen: () => { S.fCatsOpen = true; render(); },
   fSlot: a => { const f = curFood(); if (!f) return; f.slot = a; save(); render(); },
   fNow: () => { const f = curFood(); if (!f) return; f.t = nowHM(); save(); render(); },
@@ -1949,7 +2087,7 @@ const ACT = {
   export: () => IMG.all().then(images => {
     let wl = []; try { wl = JSON.parse(localStorage.getItem(WORKOUT_KEY) || '[]'); } catch (e) {}
     const out = { app: 'tracker', version: 1, exportedAt: new Date().toISOString(), data: DATA, workoutLog: wl, images,
-      legend: { suppTaken: 'supplement value = HH:MM when taken, or true if no time', scales: 'mood score 1-5 (overall mood, optional), energy 1-5 (separate energy entries; older mood entries may also carry energy), pain 0-10, severity קלה<בינונית<חזקה<קשה, bristol 1-7', dayBoundary: 'a day runs until ' + pad(dayStartH()) + ':00 the next morning; entry/supplement/food times earlier than that (00:00-' + pad(dayStartH()) + ':00) happened in the night AFTER that day, not its early morning', foodCats: Object.fromEntries(FOOD_CATS), foodItems: 'a food item may be a meal: parts = its ingredients (each with its own qty/unit and its own groups in foodLib), qty/unit on the item = the whole portion (e.g. 1 bowl); method = how it was cooked (מוקפץ adds oil, מטוגן adds fried+oil); prep = home / bought / eaten out. The groups of an item = foodLib[name].cats + its parts\' cats + method' } };
+      legend: { suppTaken: 'supplement value = HH:MM when taken, or true if no time', scales: 'mood score 1-5 (overall mood, optional), energy 1-5 (separate energy entries; older mood entries may also carry energy), pain 0-10, severity קלה<בינונית<חזקה<קשה, bristol 1-7', dayBoundary: 'a day runs until ' + pad(dayStartH()) + ':00 the next morning; entry/supplement/food times earlier than that (00:00-' + pad(dayStartH()) + ':00) happened in the night AFTER that day, not its early morning', foodCats: Object.fromEntries(FOOD_CATS), foodItems: 'a food item may be a meal: parts = its ingredients (each with its own qty/unit and its own groups in foodLib), qty/unit on the item = the whole portion (e.g. 1 bowl); method = how it was cooked (מוקפץ adds oil, מטוגן adds fried+oil); prep = home / bought / eaten out. The groups of an item = foodLib[name].cats + its parts\' cats + method', nutrition: 'foodLib[name].nut = estimated values per 100 g (kcal, p=protein, c=carbs, f=fat, fib=fiber); nutSrc user = typed by her (trust), est = estimate; g = grams per unit (מנה = typical portion). Day totals are estimates with ranges; settings.nutTarget = her daily targets' } };
     download('tracker-' + todayS() + '.json', JSON.stringify(out, null, 1));
     try { localStorage.setItem('tracker.lastBackup', todayS()); } catch (e) {}
     if (S.tab === 'settings' && !S.day) setTimeout(render, 300);
@@ -2013,6 +2151,11 @@ document.addEventListener('input', e => {
   else if (k === 'dayNote') { editDay(S.day).note = el.value; save(); }
   else if (k === 'suppName') { supp(el.dataset.a).name = el.value; save(); }
   else if (k === 'suppDose') { supp(el.dataset.a).dose = el.value; save(); }
+  else if (k === 'nut' || k === 'ng') { const [n, x] = split2(el.dataset.a); const lib = DATA.foodLib[n] = DATA.foodLib[n] || { cats: [] }; const v = el.value.trim() === '' ? null : Number(el.value);
+    if (k === 'nut') { lib.nut = lib.nut || {}; if (v == null || isNaN(v)) delete lib.nut[x]; else lib.nut[x] = v; lib.nutSrc = 'user'; if (lib.nut.kcal == null && !Object.keys(lib.nut).length) delete lib.nut; }
+    else { lib.g = lib.g || {}; lib.gSrc = lib.gSrc || {}; if (v == null || isNaN(v) || v <= 0) { delete lib.g[x]; delete lib.gSrc[x]; } else { lib.g[x] = v; lib.gSrc[x] = 1; } }
+    save(); }
+  else if (k === 'nutT') { const v = el.value.trim() === '' ? null : Number(el.value); DATA.settings.nutTarget = DATA.settings.nutTarget || {}; if (v == null || isNaN(v) || v <= 0) delete DATA.settings.nutTarget[k === 'nutT' ? el.dataset.a : k]; else DATA.settings.nutTarget[el.dataset.a] = v; save(); }
   else if (k === 'cycLen') { const v = Number(el.value); if (v >= 18 && v <= 50) { DATA.settings.cycleLen = v; save(); } }
 });
 document.addEventListener('keydown', e => {
@@ -2024,6 +2167,18 @@ document.addEventListener('change', e => {
     const f = e.target.files && e.target.files[0]; if (!f || !S.toolEd) return;
     shrinkImage(f).then(u => { S.toolEd._img = u; S.toolEd._imgDel = false; renderToolEditor(); }).catch(() => toast('לא הצלחתי לפתוח את התמונה'));
     return;
+  }
+  if (e.target.dataset && /^(nut|ng)$/.test(e.target.dataset.input || '') && S.day) { render(); return; }
+  if (e.target.dataset && e.target.dataset.change === 'importNut') {
+    const file = e.target.files && e.target.files[0]; if (!file) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try { const obj = JSON.parse(r.result); if (!obj || obj.app !== 'tracker-nutrition' || !obj.foods) throw new Error('bad');
+        const res = importNutrition(obj); save(); render(); toast(`עודכנו ${res.upd} מאכלים` + (res.kept ? ` · ${res.kept} עם ערכים שלך נשארו כמו שהם` : '')); }
+      catch (err) { alert('הקובץ לא נראה כמו קובץ ערכים תזונתיים של היומן'); }
+      e.target.value = '';
+    };
+    r.readAsText(file); return;
   }
   if (e.target.dataset && e.target.dataset.change === 'import') {
     const file = e.target.files && e.target.files[0]; if (!file) return;
