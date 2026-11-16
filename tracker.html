@@ -109,7 +109,7 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
-const APP_VERSION = '16.11ח';
+const APP_VERSION = '17.11א';
 const AMOUNTS = ['½', '1', '1½', '2', '3'];
 // units: [singular, plural]
 const UNITS = [['יחידה', 'יחידות'], ['גרם', 'גרם'], ['קובייה', 'קוביות'], ['פרוסה', 'פרוסות'], ['כף', 'כפות'], ['כפית', 'כפיות'], ['כוס', 'כוסות'],
@@ -762,6 +762,7 @@ function foodEditor(f, i) {
   const total = itemCats(f);
   return `<div style="margin-top:8px;padding:12px;border-radius:12px;background:#fff;border:1px solid #D9CCE4">
     <div class="between"><div style="font-weight:700">${esc(f.name)}</div>${isNew ? '<span class="xs" style="font-weight:700;color:#8A6A12;background:#FBF5E6;border-radius:10px;padding:2px 8px">חדש בספרייה</span>' : ''}</div>
+    ${dupBannerHtml(f.name, 'dupUse', 'dupNot')}
     ${itemNutLine(f)}
     <button class="chip" style="margin-top:6px;min-height:34px;font-size:13px" data-act="nutEd" data-a="${esc(f.name)}">${S.nutEd === f.name ? 'סגירת הערכים' : 'ערכים תזונתיים'}</button>
     ${S.nutEd === f.name ? nutEditorHtml(f.name, [f.unit]) : ''}
@@ -771,6 +772,7 @@ function foodEditor(f, i) {
     <div class="lbl">מרכיבים <span class="muted" style="font-weight:400">(לא חובה · למנה שמורכבת מכמה דברים)</span></div>
     ${parts.length ? `<div class="wrap">${parts.map((p, j) => `<span class="row" style="gap:2px;background:${S.partEdit === j ? '#EFE6F5' : 'var(--bg)'};border-radius:16px;padding:2px 4px 2px 10px;font-size:14px"><button type="button" style="background:none;border:none;padding:4px 0;font-size:14px;text-align:right" data-act="partEdit" data-a="${j}" aria-label="עריכת ${esc(p.name)}">${qtyText(p) ? `<b>${esc(qtyText(p))}</b> ` : ''}${esc(p.name)}</button><button class="iconbtn" style="width:30px;height:30px;color:var(--muted)" aria-label="הסרת ${esc(p.name)}" data-act="rmPart" data-a="${j}">${ICON.x}</button></span>`).join('')}</div>` : ''}
     ${pe ? `<div style="margin-top:8px;padding:10px;border-radius:10px;background:#F6F0FA;border:2px solid var(--accent)">
+      ${dupBannerHtml(pe.name, 'dupUseP', 'dupNotP')}
       <div class="small" style="font-weight:700">כמה ${esc(pe.name)}?</div>${qtyPicker(pe.qty != null ? String(pe.qty) : '', pe.unit || '', 'pQty', 'pUnit', 'pQtyX')}
       <div class="small muted" style="margin-top:8px">קבוצות של ${esc(pe.name)}</div>
       <div class="wrap">${FOOD_CATS.map(c => chip(c[1], ((DATA.foodLib[pe.name] || {}).cats || []).includes(c[0]), 'partCat', c[0])).join('')}</div>
@@ -1715,13 +1717,13 @@ function nutSummaryHtml(d) {
 function nutEditorHtml(name, units) {
   const lib = DATA.foodLib[name] || {}; const nut = lib.nut || {}; const g = lib.g || {};
   const us = [...new Set((units || []).filter(u => u && u !== 'גרם').concat(Object.keys(g)).concat(['מנה']))];
-  const inp = (attr, a, v, w) => `<input class="input" type="number" inputmode="decimal" min="0" style="width:${w || 80}px;min-height:38px" data-input="${attr}" data-a="${esc(a)}" value="${v != null ? esc(String(v)) : ''}">`;
+  const inp = (attr, a, v, w) => `<input class="input" type="number" inputmode="decimal" min="0" step="any" style="width:${w || 80}px;min-height:38px" data-input="${attr}" data-a="${esc(a)}" value="${v != null ? esc(String(v)) : ''}">`;
   return `<div style="margin-top:8px;padding:10px;border-radius:10px;background:var(--bg)">
     <div class="small" style="font-weight:700">ערכים ל-100 גרם של ${esc(name)}</div>
     <div class="xs muted">אפשר להעתיק מהתווית. ערך שתקלידי לא יוחלף בייבוא.</div>
-    <div class="wrap" style="margin-top:6px;gap:8px">${NUT_KEYS.map(([k, l]) => `<label class="small" style="display:flex;flex-direction:column;gap:2px">${l}${inp('nut', name + '::' + k, nut[k])}</label>`).join('')}</div>
-    <div class="small" style="font-weight:700;margin-top:10px">כמה גרם שוקלת יחידה?</div>
-    <div class="wrap" style="margin-top:6px;gap:8px">${us.map(u => `<label class="small" style="display:flex;flex-direction:column;gap:2px">${u === 'מנה' ? 'מנה רגילה' : esc(u)}${inp('ng', name + '::' + u, g[u], 72)}</label>`).join('')}</div>
+    <div class="wrap" style="margin-top:6px;gap:8px">${NUT_KEYS.map(([k, l, u]) => `<label class="small" style="display:flex;flex-direction:column;gap:2px">${l} (${u})${inp('nut', name + '::' + k, nut[k])}</label>`).join('')}</div>
+    <div class="small" style="font-weight:700;margin-top:10px">כמה שוקלת יחידה? <span style="font-weight:400">(בגרמים · אפשר עם נקודה עשרונית, למשל 1.2)</span></div>
+    <div class="wrap" style="margin-top:6px;gap:8px">${us.map(u => `<label class="small" style="display:flex;flex-direction:column;gap:2px">${u === 'מנה' ? 'מנה רגילה (ג׳)' : esc(u) + ' (ג׳)'}${inp('ng', name + '::' + u, g[u], 72)}</label>`).join('')}</div>
     ${lib.nutSrc === 'est' ? '<div class="xs muted" style="margin-top:6px">הערכים כאן הם הערכה שלי. אפשר לתקן.</div>' : lib.nutSrc === 'label' ? `<div class="xs muted" style="margin-top:6px">לפי התווית${lib.nutNote ? ': ' + esc(lib.nutNote) : ''}.</div>` : ''}
   </div>`;
 }
@@ -1745,6 +1747,114 @@ function importNutrition(obj) {
     upd++;
   });
   return { upd, kept, added };
+}
+
+/* =====================================================================
+   Similar names in the food library ("אוכמניה" / "אוכמניות", "2 קוביות שוקולד" / "קוביית שוקולד")
+   — a suggestion when a new name is typed, and a merge tool in settings
+   ===================================================================== */
+const UNIT_WORDS = (() => {
+  const m = {};
+  UNITS.forEach(([s, pl]) => { m[s] = s; m[pl] = s; });
+  Object.assign(m, { 'פרוסת': 'פרוסה', 'קוביית': 'קובייה', 'קוביות': 'קובייה', 'קערת': 'קערה', 'מנת': 'מנה', 'חפיסת': 'חפיסה', 'קופסת': 'קופסה', 'צלחת': 'מנה', 'כוס': 'כוס', 'כף': 'כף', 'כפית': 'כפית', 'חופן': 'חופן', 'שקית': 'שקית' });
+  return m;
+})();
+// "2 קוביות שוקולד מריר" → {qty:'2', unit:'קובייה', core:'שוקולד מריר'}
+function parseFoodName(n) {
+  let s = String(n || '').trim().replace(/\s+/g, ' '); let qty = null, unit = null;
+  let m = s.match(/^פרוסה וחצי\s+(.+)$/); if (m) return { qty: '1½', unit: 'פרוסה', core: m[1] };
+  m = s.match(/^(\d+(?:[.,]\d+)?|½|חצי)\s+(.+)$/); if (m) { qty = m[1] === 'חצי' ? '½' : m[1].replace(',', '.'); s = m[2]; }
+  m = s.match(/^(\S+)\s+(.+)$/); if (m && UNIT_WORDS[m[1]]) { unit = UNIT_WORDS[m[1]]; s = m[2]; if (!qty) qty = '1'; }
+  return { qty, unit, core: s };
+}
+const DUP_SYN = { 'חבית מקושקש': 'ביצ מקושקש' };
+function nameKey(n) {
+  const core = parseFoodName(n).core.toLowerCase().replace(/[()"'׳״,.\-–:]/g, ' ').replace(/\s+/g, ' ').trim();
+  const toks = core.split(' ').filter(Boolean).map(t => { if (t.length > 3) { const x = t.replace(/(יות|ות|ים|יה|ה|ת)$/, ''); if (x.length >= 2) return x; } return t; });
+  const k = toks.sort().join(' ');
+  return DUP_SYN[k] || k;
+}
+function editDist(a, b) {
+  if (Math.abs(a.length - b.length) > 2) return 9;
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+function namesSimilar(a, b) {
+  if (a === b) return false;
+  const la = DATA.foodLib[a] || {}, lb = DATA.foodLib[b] || {};
+  if ((la.notDup || []).includes(b) || (lb.notDup || []).includes(a)) return false;
+  const ka = nameKey(a), kb = nameKey(b);
+  if (!ka || !kb) return false;
+  if (ka === kb) return true;
+  // 70% and 90% chocolate are different foods
+  if ((ka.match(/\d+/g) || []).join() !== (kb.match(/\d+/g) || []).join()) return false;
+  return Math.min(ka.length, kb.length) >= 5 && editDist(ka, kb) <= 1;
+}
+function similarTo(name) { return Object.keys(DATA.foodLib).filter(n => namesSimilar(name, n)).sort((x, y) => foodUses(y) - foodUses(x)); }
+function foodUses(name) {
+  let c = 0;
+  Object.values(DATA.days).forEach(d => (d.foods || []).forEach(f => { if (f.name === name) c++; (f.parts || []).forEach(p => { if (p.name === name) c++; }); }));
+  return c;
+}
+// groups of names that look like the same food
+function dupGroups() {
+  const names = Object.keys(DATA.foodLib); const seen = new Set(); const out = [];
+  names.forEach(n => {
+    if (seen.has(n)) return;
+    const g = [n]; seen.add(n);
+    for (let i = 0; i < g.length; i++) names.forEach(m => { if (!seen.has(m) && namesSimilar(g[i], m)) { g.push(m); seen.add(m); } });
+    if (g.length > 1) out.push(g.sort((x, y) => foodUses(y) - foodUses(x)));
+  });
+  return out;
+}
+// one entry (food or ingredient) renamed to the kept name; an amount written in the old name moves into qty/unit
+function renameEntry(o, target) {
+  const p = parseFoodName(o.name), t = parseFoodName(target);
+  if (o.qty == null && o.amt == null && p.qty && !(t.qty && t.qty === p.qty && t.unit === p.unit)) { setQty(o, p.qty); if (p.unit && !o.unit) o.unit = p.unit; }
+  else if (!o.unit && p.unit && p.unit !== t.unit) o.unit = p.unit;
+  o.name = target;
+}
+function mergeFoods(sources, target) {
+  sources = sources.filter(s => s !== target);
+  Object.values(DATA.days).forEach(d => (d.foods || []).forEach(f => {
+    if (sources.includes(f.name)) renameEntry(f, target);
+    (f.parts || []).forEach(p => { if (sources.includes(p.name)) renameEntry(p, target); });
+  }));
+  const T = DATA.foodLib[target] = DATA.foodLib[target] || { cats: [] };
+  sources.forEach(s => {
+    const L = DATA.foodLib[s]; if (!L) return;
+    if (!T.confirmed && L.confirmed) T.cats = (L.cats || []).slice();
+    if (!hasNut(target) && L.nut) { T.nut = L.nut; T.nutSrc = L.nutSrc; if (L.nutNote) T.nutNote = L.nutNote; }
+    T.g = Object.assign({}, L.g || {}, T.g || {});
+    if (!T.lastPrep && L.lastPrep) T.lastPrep = L.lastPrep;
+    if (!T.parts && L.parts) { T.parts = L.parts; T.lastMethod = L.lastMethod; }
+    delete DATA.foodLib[s];
+  });
+  T.confirmed = true;
+  invalidate();
+}
+function notDup(a, b) { [[a, b], [b, a]].forEach(([x, y]) => { const L = DATA.foodLib[x]; if (L) { L.notDup = L.notDup || []; if (!L.notDup.includes(y)) L.notDup.push(y); } }); }
+// the suggestion shown inside the card of a newly typed food or ingredient
+function dupBannerHtml(name, actUse, actNo) {
+  const lib = DATA.foodLib[name]; if (!lib || lib.confirmed) return '';
+  const s = similarTo(name); if (!s.length) return '';
+  return `<div style="margin-top:8px;padding:10px;border-radius:10px;background:#FBF5E6;border:1px solid #E8D9A8">
+    <div class="small" style="font-weight:700">כבר יש בספרייה משהו דומה:</div>
+    <div class="wrap" style="margin-top:6px">${s.slice(0, 3).map(n => `<button class="chip" data-act="${actUse}" data-a="${esc(n)}">להשתמש ב"${esc(n)}"</button>`).join('')}
+      <button class="chip" data-act="${actNo}" data-a="${esc(s[0])}">לא, זה מאכל אחר</button></div>
+    <div class="xs muted" style="margin-top:4px">כך הנתונים נשמרים תחת שם אחד, והערכים והקבוצות כבר מוכנים.</div></div>`;
+}
+function dupSettingsHtml() {
+  const gs = dupGroups();
+  return `<section class="card"><h2>שמות כפולים בספרייה</h2>
+    ${gs.length ? `<div class="small muted" style="margin-bottom:6px">אלה שמות שנראים כמו אותו מאכל. בוחרים את השם שנשאר, וכל הרישומים עוברים אליו. כמות שהייתה כתובה בשם (למשל "2 קוביות") עוברת לשדה הכמות.</div>
+      ${gs.map((g, i) => `<div style="padding:10px 0;border-top:1px solid var(--line2)">
+        <div class="small">${g.map(n => `${esc(n)} <span class="muted">(${foodUses(n)})</span>`).join(' · ')}</div>
+        <div class="wrap" style="margin-top:6px">${g.map(n => `<button class="chip" style="font-size:13px" data-act="dupMerge" data-a="${i}::${esc(n)}">להשאיר "${esc(n)}"</button>`).join('')}
+          <button class="chip" style="font-size:13px" data-act="dupNo" data-a="${i}">אלה מאכלים שונים</button></div></div>`).join('')}`
+      : '<div class="small muted">אין כרגע שמות שנראים כפולים.</div>'}</section>`;
 }
 
 /* =====================================================================
@@ -1933,6 +2043,7 @@ function renderSettings() {
         <button class="chip" style="margin-top:6px;min-height:32px;font-size:13px" data-act="nutEd" data-a="${esc(n)}">${hasNut(n) ? fmtN(DATA.foodLib[n].nut.kcal) + ' קק״ל ל-100 ג׳ · עריכה' : 'אין ערכים תזונתיים · הוספה'}</button>
         ${S.nutEd === n ? nutEditorHtml(n, [DATA.foodLib[n].lastUnit]) : ''}</div>`).join('') || '<div class="small muted">עוד אין מאכלים. הם יתווספו כאן כשתזיני אוכל.</div>'}
     </details></section>
+    ${dupSettingsHtml()}
     <section class="card"><h2>תזונה (הערכה)</h2>
       <div class="small muted">${lib.filter(hasNut).length} מתוך ${lib.length} מאכלים בספרייה עם ערכים. את הערכים של כל מאכל אפשר לראות ולתקן בספריית המאכלים או בכרטיס הפריט.</div>
       <label class="btn soft block" style="display:flex;align-items:center;justify-content:center;margin-top:10px">ייבוא קובץ ערכים תזונתיים<input type="file" accept="application/json,.json" style="display:none" data-change="importNut"></label>
@@ -2030,6 +2141,12 @@ const ACT = {
   fQty: a => { const f = curFood(); if (!f) return; setQty(f, f.qty === a ? '' : a); save(); render(); },
   fUnit: a => { const f = curFood(); if (!f) return; if (f.unit === a) delete f.unit; else { f.unit = a; if (DATA.foodLib[f.name]) DATA.foodLib[f.name].lastUnit = a; } save(); render(); },
   nutEd: a => { S.nutEd = S.nutEd === a ? null : a; if (S.view === 'settings' || !S.day) S.libOpen = true; render(); },
+  dupUse: a => { const f = curFood(); if (!f) return; const old = f.name; renameEntry(f, a); if (!f.prep && lastPrepOf(a)) f.prep = lastPrepOf(a); if (!foodUses(old)) delete DATA.foodLib[old]; invalidate(); save(); render(); },
+  dupNot: a => { const f = curFood(); if (!f) return; notDup(f.name, a); save(); render(); },
+  dupUseP: a => { const f = curFood(); const p = f && f.parts && f.parts[S.partEdit]; if (!p) return; const old = p.name; renameEntry(p, a); if (!foodUses(old)) delete DATA.foodLib[old]; invalidate(); save(); render(); },
+  dupNotP: a => { const f = curFood(); const p = f && f.parts && f.parts[S.partEdit]; if (!p) return; notDup(p.name, a); save(); render(); },
+  dupMerge: a => { const [i, n] = split2(a); const g = dupGroups()[Number(i)]; if (!g) return; if (!confirm(`לאחד את ${g.length} השמות לשם "${n}"? כל הרישומים יעברו אליו.`)) return; mergeFoods(g, n); save(); render(); toast('אוחד'); },
+  dupNo: a => { const g = dupGroups()[Number(a)]; if (!g) return; g.forEach(x => g.forEach(y => { if (x !== y) notDup(x, y); })); save(); render(); },
   fCatsOpen: () => { S.fCatsOpen = true; render(); },
   fSlot: a => { const f = curFood(); if (!f) return; f.slot = a; save(); render(); },
   fNow: () => { const f = curFood(); if (!f) return; f.t = nowHM(); save(); render(); },
