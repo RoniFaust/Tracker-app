@@ -109,7 +109,7 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
-const APP_VERSION = '16.11ד';
+const APP_VERSION = '16.11ז';
 const AMOUNTS = ['½', '1', '1½', '2', '3'];
 // units: [singular, plural]
 const UNITS = [['יחידה', 'יחידות'], ['גרם', 'גרם'], ['קובייה', 'קוביות'], ['פרוסה', 'פרוסות'], ['כף', 'כפות'], ['כפית', 'כפיות'], ['כוס', 'כוסות'],
@@ -285,6 +285,8 @@ function load() {
       if (!f.confirmed && !g.includes('sugar')) f.cats = f.cats.filter(c => c !== 'sugar'); });
     DATA.settings = DATA.settings || { cycleLen: 28 }; DATA.settings.cats3 = true; migrated = true;
   }
+  // the daily targets she chose (16.11) — once; editable in settings
+  if (DATA.settings && !DATA.settings.nutTarget0) { DATA.settings.nutTarget = Object.assign({ kcal: 1700, p: 92, fib: 24 }, DATA.settings.nutTarget || {}); DATA.settings.nutTarget0 = true; migrated = true; }
   if (migrated) try { localStorage.setItem(KEY, JSON.stringify(DATA)); } catch (e) {}
   DATA.supps = DATA.supps || defaultSupps();
   DATA.settings = DATA.settings || { cycleLen: 28 };
@@ -781,6 +783,8 @@ function foodEditor(f, i) {
     <div class="small" style="color:var(--ink2)">${total.length ? esc(total.map(catName).join(', ')) : 'עוד אין קבוצות'}${parts.length || METHOD_CATS[f.method] ? ' <span class="xs muted">(כולל המרכיבים ואופן ההכנה)</span>' : ''}</div>
     ${S.fCatsOpen || (isNew && !parts.length) ? `<div class="small muted" style="margin-top:6px">${parts.length ? 'קבוצות נוספות של המנה עצמה, מעבר למרכיבים:' : 'סימון הקבוצות של המאכל (נשמר לפעמים הבאות):'}</div>
       <div class="wrap">${FOOD_CATS.map(c => chip(c[1], (lib.cats || []).includes(c[0]), 'fCat', c[0])).join('')}</div>` : '<button class="chip" style="margin-top:6px" data-act="fCatsOpen">עריכת קבוצות</button>'}
+    <label class="lbl" for="fNote" style="display:block">הערה <span class="muted" style="font-weight:400">(לא חובה · למשל מותג, מתכון, "חצי מהצלחת", איך הרגשתי)</span></label>
+    <textarea id="fNote" class="input" rows="2" style="min-height:56px;resize:vertical" data-input="fNote" placeholder="כל פרט שיעזור להבין מה אכלת">${esc(f.note || '')}</textarea>
     <div class="lbl">מתי?</div><div class="wrap">${SLOTS.map(x => chip(x, f.slot === x, 'fSlot', x)).join('')}</div>
     <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><label class="small muted" for="fT">שעה</label><input id="fT" type="time" class="input" style="width:120px;min-height:40px" value="${esc(f.t || '')}" data-input="fT">
       ${S.day === todayS() ? '<button class="chip" style="min-height:36px" data-act="fNow">עכשיו</button>' : ''}</div>
@@ -792,7 +796,7 @@ function foodCard(s) {
   const groups = SLOTS.filter(sl => d.foods.some(f => f.slot === sl)).map(sl => `
     <div style="padding:8px 0;border-bottom:1px solid var(--line2)">
       <div class="small" style="font-weight:700;color:var(--accent);margin-bottom:4px">${sl}</div>
-      <div class="wrap">${d.foods.map((f, i) => f.slot === sl ? `<button type="button" class="row" style="gap:4px;background:${S.foodEdit === i ? '#EFE6F5' : 'var(--bg)'};border:none;border-radius:16px;padding:6px 10px;font-size:14px;text-align:right;align-items:baseline;flex-wrap:wrap" data-act="foodEdit" data-a="${i}" aria-label="עריכת ${esc(f.name)}">${f.t ? `<span class="xs" style="font-weight:700;color:var(--accent)">${esc(f.t)}</span>` : ''}${qtyText(f) ? `<b>${esc(qtyText(f))}</b>` : ''}<span>${esc(f.name)}</span>${f.method ? `<span class="xs muted">${esc(f.method)}</span>` : ''}${f.prep ? `<span class="xs muted">(${esc(f.prep)})</span>` : '<span class="xs" style="color:#A3324A">(מאיפה?)</span>'}<span style="color:var(--muted);display:inline-flex" aria-hidden="true">${ICON.edit || '✎'}</span>${(f.parts || []).length ? `<span class="xs muted" style="flex-basis:100%">${esc(partsText(f))}</span>` : ''}</button>` : '').join('')}</div>
+      <div class="wrap">${d.foods.map((f, i) => f.slot === sl ? `<button type="button" class="row" style="gap:4px;background:${S.foodEdit === i ? '#EFE6F5' : 'var(--bg)'};border:none;border-radius:16px;padding:6px 10px;font-size:14px;text-align:right;align-items:baseline;flex-wrap:wrap" data-act="foodEdit" data-a="${i}" aria-label="עריכת ${esc(f.name)}">${f.t ? `<span class="xs" style="font-weight:700;color:var(--accent)">${esc(f.t)}</span>` : ''}${qtyText(f) ? `<b>${esc(qtyText(f))}</b>` : ''}<span>${esc(f.name)}</span>${f.method ? `<span class="xs muted">${esc(f.method)}</span>` : ''}${f.note ? `<span class="xs muted" style="flex-basis:100%">📝 ${esc(f.note)}</span>` : ''}${f.prep ? `<span class="xs muted">(${esc(f.prep)})</span>` : '<span class="xs" style="color:#A3324A">(מאיפה?)</span>'}<span style="color:var(--muted);display:inline-flex" aria-hidden="true">${ICON.edit || '✎'}</span>${(f.parts || []).length ? `<span class="xs muted" style="flex-basis:100%">${esc(partsText(f))}</span>` : ''}</button>` : '').join('')}</div>
       ${S.foodEdit != null && d.foods[S.foodEdit] && d.foods[S.foodEdit].slot === sl ? foodEditor(d.foods[S.foodEdit], S.foodEdit) : ''}
     </div>`).join('');
   const recent = recentFoods();
@@ -1619,12 +1623,12 @@ Object.assign(ACT_EXTRA, {
 /* =====================================================================
    Nutrition estimates — values per 100 g in the food library + grams per unit
    lib.nut = {kcal, p, c, f, fib} per 100 g · lib.g = {unit: grams, 'מנה': typical portion}
-   lib.nutSrc = 'user' (typed by her, never overwritten by an import) | 'est'
+   lib.nutSrc = 'user' (typed by her, never overwritten by an import) | 'label' (from a package photo she sent) | 'est'
    ===================================================================== */
 const NUT_KEYS = [['kcal', 'קלוריות', 'קק״ל'], ['p', 'חלבון', 'ג׳'], ['c', 'פחמימה', 'ג׳'], ['f', 'שומן', 'ג׳'], ['fib', 'סיבים', 'ג׳']];
 // rough fallback only when a food has no grams for that unit (wider uncertainty)
 const UNIT_G_FALLBACK = { 'כף': 15, 'כפית': 5, 'כוס': 200, 'חופן': 30, 'קערה': 300, 'מנה': 250, 'פרוסה': 30, 'קובייה': 10 };
-const METHOD_OIL_G = { 'מוקפץ': 10, 'מטוגן': 20 };
+const METHOD_OIL_G = { 'מוקפץ': 15, 'מטוגן': 25 }; // she cooks with a generous amount of olive oil
 const OIL_100 = { kcal: 884, p: 0, c: 0, f: 100, fib: 0 };
 
 function hasNut(name) { const l = DATA.foodLib[name]; return !!(l && l.nut && l.nut.kcal != null); }
@@ -1640,7 +1644,8 @@ function gramsOf(name, o) {
   else if (!o.unit && g['יחידה']) { grams = n * g['יחידה']; unc = 0.25; }
   else if (o.unit && UNIT_G_FALLBACK[o.unit]) { grams = n * UNIT_G_FALLBACK[o.unit]; unc = 0.35; }
   if (grams == null) return null;
-  if (!hasQty) unc = Math.max(unc, 0.5);
+  // no amount written: if the name itself says how much ("פרוסת…", "2 קוביות…", one yogurt) the portion is fairly known
+  if (!hasQty) unc = Math.max(unc, lib.portionInName ? 0.25 : 0.5);
   return { g: grams, unc };
 }
 function scaleNut(nut, grams) { const o = {}; NUT_KEYS.forEach(([k]) => { o[k] = (Number(nut[k]) || 0) * grams / 100; }); return o; }
@@ -1717,7 +1722,7 @@ function nutEditorHtml(name, units) {
     <div class="wrap" style="margin-top:6px;gap:8px">${NUT_KEYS.map(([k, l]) => `<label class="small" style="display:flex;flex-direction:column;gap:2px">${l}${inp('nut', name + '::' + k, nut[k])}</label>`).join('')}</div>
     <div class="small" style="font-weight:700;margin-top:10px">כמה גרם שוקלת יחידה?</div>
     <div class="wrap" style="margin-top:6px;gap:8px">${us.map(u => `<label class="small" style="display:flex;flex-direction:column;gap:2px">${u === 'מנה' ? 'מנה רגילה' : esc(u)}${inp('ng', name + '::' + u, g[u], 72)}</label>`).join('')}</div>
-    ${lib.nutSrc === 'est' ? '<div class="xs muted" style="margin-top:6px">הערכים כאן הם הערכה שלי. אפשר לתקן.</div>' : ''}
+    ${lib.nutSrc === 'est' ? '<div class="xs muted" style="margin-top:6px">הערכים כאן הם הערכה שלי. אפשר לתקן.</div>' : lib.nutSrc === 'label' ? `<div class="xs muted" style="margin-top:6px">לפי התווית${lib.nutNote ? ': ' + esc(lib.nutNote) : ''}.</div>` : ''}
   </div>`;
 }
 function itemNutLine(f) {
@@ -1735,7 +1740,8 @@ function importNutrition(obj) {
     const gs = lib.gSrc || {}; lib.g = lib.g || {};
     Object.entries(v.g || {}).forEach(([u, x]) => { if (!gs[u]) lib.g[u] = x; });
     if (lib.nutSrc === 'user') { kept++; return; }
-    if (v.nut) { lib.nut = v.nut; lib.nutSrc = 'est'; }
+    if (v.nut) { lib.nut = v.nut; lib.nutSrc = v.src === 'label' ? 'label' : 'est'; if (v.note) lib.nutNote = v.note; else delete lib.nutNote; }
+    if (v.portionInName != null) lib.portionInName = !!v.portionInName;
     upd++;
   });
   return { upd, kept, added };
@@ -2134,6 +2140,7 @@ document.addEventListener('input', e => {
   else if (k === 'fQtyX') { const f = curFood(); if (f) { setQty(f, el.value.trim()); save(); } }
   else if (k === 'pQtyX') { const f = curFood(); const p = f && f.parts && f.parts[S.partEdit]; if (p) { setQty(p, el.value.trim()); save(); } }
   else if (k === 'partDraft') S.partDraft = el.value;
+  else if (k === 'fNote') { const f = curFood(); if (f) { const v = el.value; if (v.trim()) f.note = v; else delete f.note; save(); } }
   else if (k === 'fT') { const f = editDay(S.day).foods[S.foodEdit]; if (f) { if (el.value) f.t = el.value; else delete f.t; save(); } }
   else if (k === 'craveAt') { const d = editDay(S.day); d.craveT = d.craveT || {}; d.craveT[el.dataset.a] = el.value || true; save(); }
   else if (k === 'sleepNote') { editDay(S.day).sleepNote = el.value; save(); }
