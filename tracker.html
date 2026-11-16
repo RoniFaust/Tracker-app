@@ -109,7 +109,7 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
-const APP_VERSION = '16.11ז';
+const APP_VERSION = '16.11ח';
 const AMOUNTS = ['½', '1', '1½', '2', '3'];
 // units: [singular, plural]
 const UNITS = [['יחידה', 'יחידות'], ['גרם', 'גרם'], ['קובייה', 'קוביות'], ['פרוסה', 'פרוסות'], ['כף', 'כפות'], ['כפית', 'כפיות'], ['כוס', 'כוסות'],
@@ -2169,6 +2169,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.dataset && e.target.dataset.enter) { e.preventDefault(); ACT[e.target.dataset.enter](); }
 });
 document.addEventListener('change', e => {
+  if (e.target && e.target.type === 'file') pickingFile = 0;
   if (e.target.id === 'tUrl' && S.toolEd) { renderToolEditor(); return; }
   if (e.target.dataset && e.target.dataset.change === 'toolImg') {
     const f = e.target.files && e.target.files[0]; if (!f || !S.toolEd) return;
@@ -2210,7 +2211,11 @@ window.addEventListener('popstate', () => {
 function flushNote() { const el = document.getElementById('dayNote'); if (el && S.day && el.value !== getDay(S.day).note) { clearTimeout(noteTimer); editDay(S.day).note = el.value; save(); } }
 window.addEventListener('pagehide', flushNote);
 // another app (Workout Pro) may have written new workouts — refresh when we come back
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { invalidate(); if (!$sheet.classList.contains('open') && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) render(); } });
+// while a file picker is open the page is hidden; re-rendering on return would replace the file input
+// before its change event arrives, and the chosen file would be lost
+let pickingFile = 0;
+document.addEventListener('click', e => { const t = e.target; if (t && t.closest && (t.matches('input[type=file]') || (t.closest('label') && t.closest('label').querySelector('input[type=file]')))) pickingFile = Date.now(); }, true);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { invalidate(); if (pickingFile && Date.now() - pickingFile < 10 * 60 * 1000) { pickingFile = 0; return; } if (!$sheet.classList.contains('open') && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) render(); } });
 
 /* ---------------- init ---------------- */
 load();
