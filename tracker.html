@@ -109,11 +109,11 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
-const APP_VERSION = '12.11ג';
+const APP_VERSION = '16.11ב';
 const AMOUNTS = ['½', '1', '1½', '2', '3'];
 // units: [singular, plural]
-const UNITS = [['יחידה', 'יחידות'], ['קובייה', 'קוביות'], ['פרוסה', 'פרוסות'], ['כף', 'כפות'], ['כפית', 'כפיות'], ['כוס', 'כוסות'],
-  ['חופן', 'חופנים'], ['מנה', 'מנות'], ['חפיסה', 'חפיסות'], ['שקית', 'שקיות'], ['קערה', 'קערות'], ['גרם', 'גרם']];
+const UNITS = [['יחידה', 'יחידות'], ['גרם', 'גרם'], ['קובייה', 'קוביות'], ['פרוסה', 'פרוסות'], ['כף', 'כפות'], ['כפית', 'כפיות'], ['כוס', 'כוסות'],
+  ['חופן', 'חופנים'], ['מנה', 'מנות'], ['חפיסה', 'חפיסות'], ['שקית', 'שקיות'], ['קערה', 'קערות']];
 // "5-7", "2", "½", "1½" -> a number (range = middle), for later analysis
 function qtyNum(q) {
   if (q == null || q === '') return null;
@@ -126,9 +126,19 @@ function qtyText(f) {
   const q = f.qty != null ? String(f.qty).replace('-', '–') : (f.amt && f.amt !== 1 ? (f.amt === 0.5 ? '½' : f.amt === 1.5 ? '1½' : String(f.amt)) : '');
   const u = UNITS.find(x => x[0] === f.unit);
   if (!u) return q ? q + '×' : '';
-  if (!q || q === '1') return u[0];
+  if (!q || q === '1') return u[0] === 'יחידה' ? '1' : u[0];
   if (q === '½') return 'חצי ' + u[0];
   return q + ' ' + u[1];
+}
+// how it was cooked (optional, per item or for a whole meal)
+const METHODS = ['מוקפץ', 'מטוגן', 'אפוי', 'מבושל', 'צלוי / גריל', 'מאודה', 'טרי / לא מבושל'];
+const METHOD_CATS = { 'מוקפץ': ['oil'], 'מטוגן': ['fried', 'oil'] };
+// the groups of one eaten item = its own groups + its ingredients' groups + what the cooking adds
+function itemCats(f) {
+  const set = new Set(((DATA.foodLib[f.name] || {}).cats) || []);
+  (f.parts || []).forEach(p => ((DATA.foodLib[p.name] || {}).cats || []).forEach(c => set.add(c)));
+  (METHOD_CATS[f.method] || []).forEach(c => set.add(c));
+  return [...set];
 }
 const isHM = v => typeof v === 'string' && /^\d\d:\d\d$/.test(v);
 /* =====================================================================
@@ -179,7 +189,7 @@ const SEVERITY = ['קלה', 'בינונית', 'חזקה', 'קשה'];
 
 const GEN_GROUPS = [
   ['ראש וקוגניציה', ['כאב ראש', 'מיגרנה', 'ערפל מוחי', 'קושי להתרכז', 'סחרחורת']],
-  ['אנרגיה ושינה', ['עייפות קיצונית', 'נדודי שינה']],
+  ['אנרגיה ושינה', ['חולשה כללית', 'עייפות קיצונית', 'נדודי שינה']],
   ['חום וגוף', ['חום', 'צמרמורות', 'גלי חום', 'דופק מהיר', 'כאבי שרירים כלליים']],
   ['צינון ונשימה', ['צינון', 'נזלת', 'גודש באף', 'כאב גרון', 'שיעול', 'ליחה', 'צרידות']],
   ['הורמונלי', ['רגישות בשדיים', 'אקנה', 'רגישות לריחות']],
@@ -224,7 +234,12 @@ const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.get
 const parseD = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 12); };
 const addDays = (s, n) => { const d = parseD(s); d.setDate(d.getDate() + n); return ymd(d); };
 const diffDays = (a, b) => Math.round((parseD(b) - parseD(a)) / 86400000); // b - a
-const todayS = () => ymd(new Date());
+// the day ends when she goes to sleep, not at midnight: until dayStart (default 05:00) it is still the previous day
+const dayStartH = () => { try { const v = DATA && DATA.settings && DATA.settings.dayStart; return v == null ? 5 : Number(v); } catch (e) { return 5; } };
+const todayS = () => { const d = new Date(); if (d.getHours() < dayStartH()) d.setDate(d.getDate() - 1); return ymd(d); };
+// a time before dayStart is the night at the END of that day
+const isNightT = t => !!t && Number(String(t).slice(0, 2)) < dayStartH();
+const tKey = t => (isNightT(t) ? '2' : '1') + (t || '');
 const nowHM = () => { const d = new Date(); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
 const fmtLong = s => { const d = parseD(s); return 'יום ' + DAY_NAMES[d.getDay()] + ', ' + d.getDate() + ' ב' + MONTHS[d.getMonth()]; };
 const fmtShort = s => { const d = parseD(s); return d.getDate() + '.' + (d.getMonth() + 1); };
@@ -297,11 +312,12 @@ function workoutsByDate() {
     if (!w || !w.date) return;
     const areas = new Set();
     (w.exercises || []).forEach(ex => (ex.areas || []).forEach(a => areas.add(AREA_HE[a] || a)));
-    (_workouts[w.date] = _workouts[w.date] || []).push({
+    const wd = isNightT(w.time) ? addDays(w.date, -1) : w.date;
+    (_workouts[wd] = _workouts[wd] || []).push({
       name: w.name || 'אימון', min: Math.round((w.totalSeconds || 0) / 60), cardio: w.kind === 'cardio', areas: [...areas], time: w.time || '', end: w.end || ''
     });
   });
-  Object.values(_workouts).forEach(list => list.sort((a, b) => (a.time || '99').localeCompare(b.time || '99')));
+  Object.values(_workouts).forEach(list => list.sort((a, b) => tKey(a.time || '99').localeCompare(tKey(b.time || '99'))));
   return _workouts;
 }
 function workoutMin(s) { return (workoutsByDate()[s] || []).reduce((a, w) => a + w.min, 0); }
@@ -378,7 +394,7 @@ let _metrics = {};
 function metrics(s) {
   if (_metrics[s]) return _metrics[s];
   const d = getDay(s);
-  const ents = d.entries.slice().sort((a, b) => a.t.localeCompare(b.t));
+  const ents = d.entries.slice().sort((a, b) => tKey(a.t).localeCompare(tKey(b.t)));
   const moods = ents.filter(e => e.kind === 'mood');
   const scores = moods.map(e => e.score).filter(Boolean);
   const famW = {};
@@ -404,7 +420,7 @@ function metrics(s) {
     supp: suppDayStats(s).pct,
     bleed: d.bleed,
     sleep: d.sleepH ? SLEEP_H_NUM[SLEEP_H.indexOf(d.sleepH)] : null,
-    cats: (() => { const set = new Set(); d.foods.forEach(f => ((DATA.foodLib[f.name] || {}).cats || []).forEach(c => set.add(c))); return set; })(),
+    cats: (() => { const set = new Set(); d.foods.forEach(f => itemCats(f).forEach(c => set.add(c))); return set; })(),
     foodsLogged: d.foods.length > 0
   };
   _metrics[s] = m;
@@ -623,7 +639,7 @@ function kindSummary(kind, list) {
 }
 function renderDay() {
   const s = S.day, d = getDay(s), c = cycleOf(s);
-  const ents = d.entries.slice().sort((a, b) => a.t.localeCompare(b.t));
+  const ents = d.entries.slice().sort((a, b) => tKey(a.t).localeCompare(tKey(b.t)));
   const st = suppDayStats(s);
   const foodsN = d.foods.length;
   const ws = workoutsByDate()[s] || [];
@@ -691,7 +707,7 @@ function entrySummary(e) {
 function entryRow(e) {
   const x = entrySummary(e);
   return `<button type="button" class="tl-item" style="width:100%;background:none;border-left:none;border-right:none;border-bottom:none;text-align:right" data-act="editEntry" data-a="${e.id}" aria-label="עריכת רשומה ${esc(e.t)}">
-    <span class="tl-time">${esc(e.t)}</span>
+    <span class="tl-time">${esc(e.t)}${isNightT(e.t) ? '<span class="xs muted" style="display:block;font-weight:400">אחרי חצות</span>' : ''}</span>
     <span class="dot" style="background:${x.c};margin-top:7px"></span>
     <span style="flex:1;min-width:0">
       <span style="display:block;font-size:15px;font-weight:700">${esc(x.title)}</span>
@@ -732,23 +748,48 @@ function recentFoods() {
 }
 function qtyPicker(q, unit, actQ, actU, inp) {
   return `<div class="wrap">${AMOUNTS.map(a => chip(a, q === a, actQ, a)).join('')}
-      <input class="input" type="text" inputmode="text" style="width:96px;min-height:40px;background:#fff" placeholder="אחר / 5-7" value="${esc(q && !AMOUNTS.includes(q) ? q : '')}" data-input="${inp}" aria-label="כמות אחרת או טווח"></div>
+      <input class="input" type="text" inputmode="text" style="width:96px;min-height:40px;background:#fff" placeholder="אחר: 30 / 5-7" value="${esc(q && !AMOUNTS.includes(q) ? q : '')}" data-input="${inp}" aria-label="כמות אחרת או טווח"></div>
     <div class="wrap" style="margin-top:6px">${UNITS.map(u => chip(u[0], unit === u[0], actU, u[0])).join('')}</div>`;
+}
+function partsText(f) { return (f.parts || []).map(p => (qtyText(p) ? qtyText(p) + ' ' : '') + p.name).join(', '); }
+function foodEditor(f, i) {
+  const lib = DATA.foodLib[f.name] || { cats: [] };
+  const isNew = !lib.confirmed;
+  const parts = f.parts || [];
+  const pe = S.partEdit != null ? parts[S.partEdit] : null;
+  const total = itemCats(f);
+  return `<div style="margin-top:8px;padding:12px;border-radius:12px;background:#fff;border:1px solid #D9CCE4">
+    <div class="between"><div style="font-weight:700">${esc(f.name)}</div>${isNew ? '<span class="xs" style="font-weight:700;color:#8A6A12;background:#FBF5E6;border-radius:10px;padding:2px 8px">חדש בספרייה</span>' : ''}</div>
+    <div class="lbl" style="margin-top:6px">מאיפה?</div><div class="wrap">${PREP.map(x => chip(x, f.prep === x, 'fPrep', x)).join('')}</div>
+    <div class="lbl">איך הוכן? <span class="muted" style="font-weight:400">(לא חובה)</span></div><div class="wrap">${METHODS.map(x => chip(x, f.method === x, 'fMethod', x)).join('')}</div>
+    <div class="lbl">כמה? <span class="muted" style="font-weight:400">(${parts.length ? 'של המנה כולה, למשל קערה אחת · ' : ''}לא חובה)</span></div>${qtyPicker(f.qty != null ? String(f.qty) : (f.amt ? String(f.amt) : ''), f.unit || '', 'fQty', 'fUnit', 'fQtyX')}
+    <div class="lbl">מרכיבים <span class="muted" style="font-weight:400">(לא חובה · למנה שמורכבת מכמה דברים)</span></div>
+    ${parts.length ? `<div class="wrap">${parts.map((p, j) => `<span class="row" style="gap:2px;background:${S.partEdit === j ? '#EFE6F5' : 'var(--bg)'};border-radius:16px;padding:2px 4px 2px 10px;font-size:14px"><button type="button" style="background:none;border:none;padding:4px 0;font-size:14px;text-align:right" data-act="partEdit" data-a="${j}" aria-label="עריכת ${esc(p.name)}">${qtyText(p) ? `<b>${esc(qtyText(p))}</b> ` : ''}${esc(p.name)}</button><button class="iconbtn" style="width:30px;height:30px;color:var(--muted)" aria-label="הסרת ${esc(p.name)}" data-act="rmPart" data-a="${j}">${ICON.x}</button></span>`).join('')}</div>` : ''}
+    ${pe ? `<div style="margin-top:8px;padding:10px;border-radius:10px;background:var(--bg)">
+      <div class="small" style="font-weight:700">${esc(pe.name)}: כמה?</div>${qtyPicker(pe.qty != null ? String(pe.qty) : '', pe.unit || '', 'pQty', 'pUnit', 'pQtyX')}
+      <div class="small muted" style="margin-top:8px">קבוצות של ${esc(pe.name)}</div>
+      <div class="wrap">${FOOD_CATS.map(c => chip(c[1], ((DATA.foodLib[pe.name] || {}).cats || []).includes(c[0]), 'partCat', c[0])).join('')}</div>
+      <button class="chip" style="margin-top:8px" data-act="partEdit" data-a="${S.partEdit}">סגירת המרכיב</button></div>` : ''}
+    <div class="row" style="margin-top:8px"><input id="partIn" class="input" list="foodList" placeholder="${parts.length ? 'עוד מרכיב' : 'לדוגמה: טופו'}" autocomplete="off" enterkeyhint="done" data-enter="addPart" data-input="partDraft" value="${esc(S.partDraft || '')}">
+      <button class="btn ghost" style="flex:0 0 auto" data-act="addPart">+ מרכיב</button></div>
+    <div class="lbl">קבוצות</div>
+    <div class="small" style="color:var(--ink2)">${total.length ? esc(total.map(catName).join(', ')) : 'עוד אין קבוצות'}${parts.length || METHOD_CATS[f.method] ? ' <span class="xs muted">(כולל המרכיבים ואופן ההכנה)</span>' : ''}</div>
+    ${S.fCatsOpen || (isNew && !parts.length) ? `<div class="small muted" style="margin-top:6px">${parts.length ? 'קבוצות נוספות של המנה עצמה, מעבר למרכיבים:' : 'סימון הקבוצות של המאכל (נשמר לפעמים הבאות):'}</div>
+      <div class="wrap">${FOOD_CATS.map(c => chip(c[1], (lib.cats || []).includes(c[0]), 'fCat', c[0])).join('')}</div>` : '<button class="chip" style="margin-top:6px" data-act="fCatsOpen">עריכת קבוצות</button>'}
+    <div class="lbl">מתי?</div><div class="wrap">${SLOTS.map(x => chip(x, f.slot === x, 'fSlot', x)).join('')}</div>
+    <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><label class="small muted" for="fT">שעה</label><input id="fT" type="time" class="input" style="width:120px;min-height:40px" value="${esc(f.t || '')}" data-input="fT">
+      ${S.day === todayS() ? '<button class="chip" style="min-height:36px" data-act="fNow">עכשיו</button>' : ''}</div>
+    <div class="row" style="margin-top:12px"><button class="btn" style="flex:1" data-act="foodEditDone">סיום</button><button class="btn ghost" style="color:#A3324A" data-act="rmFood" data-a="${i}">מחיקה</button></div>
+  </div>`;
 }
 function foodCard(s) {
   const d = getDay(s);
   const groups = SLOTS.filter(sl => d.foods.some(f => f.slot === sl)).map(sl => `
     <div style="padding:8px 0;border-bottom:1px solid var(--line2)">
       <div class="small" style="font-weight:700;color:var(--accent);margin-bottom:4px">${sl}</div>
-      <div class="wrap">${d.foods.map((f, i) => f.slot === sl ? `<span class="row" style="gap:2px;background:var(--bg);border-radius:16px;padding:2px 4px 2px 10px;font-size:14px">${f.t ? `<span class="xs" style="font-weight:700;color:var(--accent)">${esc(f.t)}</span> ` : ''}<button type="button" style="background:none;border:none;padding:4px 0;font-size:14px;text-align:right" data-act="foodEdit" data-a="${i}" aria-label="עריכת ${esc(f.name)}">${qtyText(f) ? `<b>${esc(qtyText(f))}</b> ` : ''}${esc(f.name)}${f.prep ? ` <span class="xs muted">(${esc(f.prep)})</span>` : ' <span class="xs" style="color:#A3324A">(הכנה?)</span>'}</button><button class="iconbtn" style="width:32px;height:32px;color:var(--muted)" aria-label="הסרת ${esc(f.name)}" data-act="rmFood" data-a="${i}">${ICON.x}</button></span>` : '').join('')}</div>
-      ${S.foodEdit != null && d.foods[S.foodEdit] && d.foods[S.foodEdit].slot === sl ? (() => { const f = d.foods[S.foodEdit]; return `<div style="margin-top:8px;padding:10px;border-radius:12px;background:#fff;border:1px solid #D9CCE4">
-        <div class="small" style="font-weight:700;margin-bottom:6px">${esc(f.name)}</div>
-        <div class="wrap">${PREP.map(x => chip(x, f.prep === x, 'fPrep', x)).join('')}</div>
-        <div class="small muted" style="margin-top:8px">כמה?</div>${qtyPicker(f.qty != null ? String(f.qty) : (f.amt ? String(f.amt) : ''), f.unit || '', 'fQty', 'fUnit', 'fQtyX')}
-        <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><label class="small muted" for="fT">שעה</label><input id="fT" type="time" class="input" style="width:120px;min-height:40px" value="${esc(f.t || '')}" data-input="fT">
-          <button class="chip" data-act="foodEditDone">סגירה</button></div></div>`; })() : ''}
+      <div class="wrap">${d.foods.map((f, i) => f.slot === sl ? `<button type="button" class="row" style="gap:4px;background:${S.foodEdit === i ? '#EFE6F5' : 'var(--bg)'};border:none;border-radius:16px;padding:6px 10px;font-size:14px;text-align:right;align-items:baseline;flex-wrap:wrap" data-act="foodEdit" data-a="${i}" aria-label="עריכת ${esc(f.name)}">${f.t ? `<span class="xs" style="font-weight:700;color:var(--accent)">${esc(f.t)}</span>` : ''}${qtyText(f) ? `<b>${esc(qtyText(f))}</b>` : ''}<span>${esc(f.name)}</span>${f.method ? `<span class="xs muted">${esc(f.method)}</span>` : ''}${f.prep ? `<span class="xs muted">(${esc(f.prep)})</span>` : '<span class="xs" style="color:#A3324A">(מאיפה?)</span>'}<span style="color:var(--muted);display:inline-flex" aria-hidden="true">${ICON.edit || '✎'}</span>${(f.parts || []).length ? `<span class="xs muted" style="flex-basis:100%">${esc(partsText(f))}</span>` : ''}</button>` : '').join('')}</div>
+      ${S.foodEdit != null && d.foods[S.foodEdit] && d.foods[S.foodEdit].slot === sl ? foodEditor(d.foods[S.foodEdit], S.foodEdit) : ''}
     </div>`).join('');
-  const p = S.pending;
   const recent = recentFoods();
   return `<div>
     <div class="small muted" style="margin-bottom:4px">אפשר לפרט לפי ארוחות, או לרשום הכל בסוף היום</div>
@@ -756,23 +797,13 @@ function foodCard(s) {
     <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><label class="small muted" for="foodTime">שעה (לא חובה)</label>
       <input id="foodTime" type="time" class="input" style="width:120px;min-height:40px" value="${esc(S.foodTime || '')}" data-input="foodTime">
       ${S.day === todayS() ? `<button class="chip" style="min-height:36px" data-act="foodNow">עכשיו</button>` : ''}${S.foodTime ? `<button class="chip" style="min-height:36px" data-act="foodTimeClear">ניקוי</button>` : ''}</div>
-    <div class="lbl">הכנה</div><div class="wrap">${chip('אוטומטי', !S.prepTouched, 'prep', 'auto')}${PREP.map(x => chip(x, S.prepTouched && S.prep === x, 'prep', x)).join('')}</div>
-    <div class="lbl">כמה? (לא חובה)</div>${qtyPicker(S.foodQty || '', S.foodUnit != null ? S.foodUnit : '', 'foodQty', 'foodUnit', 'foodQtyX')}
-    <div class="xs muted" style="margin-top:4px">אפשר גם טווח או הערכה, למשל 5-7 כפות או חופן. כך כל מאכל נשמר בשם אחד, והכמות בנפרד.${S.foodUnit == null ? ' היחידה נבחרת אוטומטית לפי הפעם הקודמת.' : ''}</div>
-    <div class="xs muted" style="margin-top:4px">${S.prepTouched ? 'ייקבע רק לפריט הבא, ואז חוזר לאוטומטי.' : 'כל מאכל יקבל את ההכנה שבחרת לו בפעם הקודמת. למאכל חדש תישאלי.'}</div>
     <label class="lbl" for="foodIn" style="display:block">מה אכלת?</label>
     <div class="row">
-      <input id="foodIn" class="input" list="foodList" placeholder="לדוגמה: פסטה עם רוטב עגבניות" autocomplete="off" enterkeyhint="done" data-enter="addFood" data-input="foodDraft" value="${esc(S.foodDraft || '')}">
+      <input id="foodIn" class="input" list="foodList" placeholder="מאכל אחד, או שם של מנה" autocomplete="off" enterkeyhint="done" data-enter="addFood" data-input="foodDraft" value="${esc(S.foodDraft || '')}">
       <button class="btn" style="flex:0 0 auto" data-act="addFood">הוספה</button>
     </div>
+    <div class="xs muted" style="margin-top:4px">אחרי ההוספה נפתחים הפרטים: מאיפה, איך הוכן, כמה, ומרכיבים אם זו מנה (למשל נודלס מוקפץ ← טופו, פלפל, אטריות אורז). אפשר לחזור ולערוך כל פריט בלחיצה עליו.</div>
     <datalist id="foodList">${[...new Set(Object.keys(DATA.foodLib).concat(Object.keys(FOOD_DICT)))].map(n => `<option value="${esc(n)}">`).join('')}</datalist>
-    ${p ? `<div style="margin-top:10px;padding:12px;border-radius:12px;background:#FBF5E6;border:1px solid #EAD9AE">
-      <div style="font-weight:700">פריט חדש: ${esc(p.name)}</div>
-      <div class="small" style="color:var(--ink2);margin:2px 0 8px">${p.guessed ? 'זיהיתי את הקבוצות המסומנות. אפשר לתקן בלחיצה — שואלים רק בפעם הראשונה.' : 'לא זיהיתי אוטומטית. לאילו קבוצות הוא שייך? שואלים רק בפעם הראשונה.'}</div>
-      <div class="wrap">${FOOD_CATS.map(c => chip(c[1], p.cats.includes(c[0]), 'pcat', c[0])).join('')}</div>
-      <div class="lbl">הכנה הפעם</div><div class="wrap">${PREP.map(x => chip(x, p.prep === x, 'pPrep', x)).join('')}</div>
-      <div class="row" style="margin-top:10px"><button class="btn" style="flex:1;background:var(--gold)" data-act="confirmFood">אישור</button><button class="btn ghost" data-act="skipFood">אחר כך</button></div>
-    </div>` : ''}
     ${recent.length ? `<div class="lbl">הוספה מהירה</div><div class="wrap">${recent.map(n => `<button class="chip dashed" data-act="quickFood" data-a="${esc(n)}">+ ${esc(n)}</button>`).join('')}</div>` : ''}
     ${groups ? `<div style="margin-top:12px;border-top:1px solid var(--line2)">${groups}</div>` : ''}
     <div class="lbl">חשקים ורתיעות</div><div class="wrap">${CRAVES.map(x => { const on = d.craves.includes(x), at = (d.craveT || {})[x]; return `<button type="button" class="chip" aria-pressed="${on}" data-act="crave" data-a="${esc(x)}">${esc(x)}${on && isHM(at) ? ` <span style="font-weight:600;opacity:.9">${at}</span>` : ''}</button>`; }).join('')}</div>
@@ -1765,6 +1796,8 @@ function renderSettings() {
     </details></section>
     <section class="card"><h2>מחזור</h2><label class="small muted" for="cycLen">אורך מחזור משוער (עד שיצטברו נתונים)</label>
       <div class="row" style="margin-top:6px"><input id="cycLen" class="input" style="width:100px" type="number" min="18" max="50" value="${DATA.settings.cycleLen || 28}" data-input="cycLen"><span class="small muted">ימים · מחושב בפועל: ${cycleInfo().n >= 2 ? cycleInfo().len + ' ימים' : 'עוד אין מספיק מחזורים'}</span></div></section>
+    <section class="card"><h2>מתי מתחיל יום חדש</h2><div class="small muted">רישום אחרי חצות ועד השעה הזו שייך ליום הקודם (הלילה שבסופו). "פתיחת היום" וכפתורי "עכשיו" פותחים אותו.</div>
+      <div class="wrap" style="margin-top:8px">${[2, 3, 4, 5, 6, 7].map(h => `<button type="button" class="chip" aria-pressed="${dayStartH() === h}" data-act="dayStart" data-a="${h}">${pad(h)}:00</button>`).join('')}</div></section>
     <section class="card"><h2>גיבוי וייצוא</h2>
       <div class="small muted" style="margin-bottom:10px">${last ? 'גיבוי אחרון: ' + fmtShort(last) + '.' + last.slice(0, 4) : 'עוד לא גיבית. הנתונים נשמרים רק בטלפון הזה.'}</div>
       <button class="btn block" data-act="export">ייצוא נתונים (גיבוי + ניתוח עם Claude)</button>
@@ -1800,24 +1833,25 @@ function addFoodName(name) {
   name = (name || '').trim().replace(/\s+/g, ' ');
   if (!name) return;
   const d = editDay(S.day);
-  // prep: chosen for this item, else the one this food had last time, else ask (new food card)
-  const prep = S.prepTouched ? S.prep : lastPrepOf(name);
-  const item = { name, slot: S.slot, prep: prep || '' }; if (S.foodTime) item.t = S.foodTime; if (S.foodQty) { item.qty = S.foodQty; const v = qtyNum(S.foodQty); if (v != null) item.qn = v; }
-  const unit = S.foodUnit != null ? S.foodUnit : ((DATA.foodLib[name] || {}).lastUnit || '');
-  if (unit && (S.foodQty || S.foodUnit != null)) item.unit = unit;
-  if (S.foodUnit && DATA.foodLib[name]) DATA.foodLib[name].lastUnit = S.foodUnit;
+  if (!DATA.foodLib[name]) DATA.foodLib[name] = { cats: guessFoodCats(name).cats, confirmed: false };
+  const lib = DATA.foodLib[name];
+  // filled from what this food had last time; everything is editable in the card that opens
+  const item = { name, slot: S.slot, prep: lastPrepOf(name) || '' };
+  if (S.foodTime) item.t = S.foodTime;
+  if (lib.lastUnit) item.unit = lib.lastUnit;
+  if (lib.parts && lib.parts.length) { item.parts = lib.parts.map(p => Object.assign({}, p)); if (lib.lastMethod) item.method = lib.lastMethod; }
   d.foods.push(item);
-  if (prep && DATA.foodLib[name]) DATA.foodLib[name].lastPrep = prep;
-  if (!DATA.foodLib[name]) {
-    const g = guessFoodCats(name);
-    DATA.foodLib[name] = { cats: g.cats, confirmed: false };
-    if (prep) DATA.foodLib[name].lastPrep = prep;
-    S.pending = { name, cats: g.cats.slice(), guessed: g.guessed, prep: prep || '', idx: d.foods.length - 1 };
-  }
-  if (S.foodUnit && DATA.foodLib[name]) DATA.foodLib[name].lastUnit = S.foodUnit;
-  S.prepTouched = false; S.foodQty = ''; S.foodUnit = null;
+  S.foodEdit = d.foods.length - 1; S.partEdit = null; S.fCatsOpen = false; S.partDraft = '';
   save();
 }
+function curFood() { return S.foodEdit != null ? editDay(S.day).foods[S.foodEdit] : null; }
+// a meal remembers its ingredients (without amounts that change) so next time they come back filled
+function rememberMeal(f) {
+  const lib = DATA.foodLib[f.name]; if (!lib) return;
+  if ((f.parts || []).length) { lib.parts = f.parts.map(p => { const o = { name: p.name }; if (p.unit) o.unit = p.unit; if (p.qty != null) { o.qty = p.qty; if (p.qn != null) o.qn = p.qn; } return o; }); if (f.method) lib.lastMethod = f.method; else delete lib.lastMethod; }
+  else { delete lib.parts; delete lib.lastMethod; }
+}
+function setQty(o, v) { delete o.amt; if (v) { o.qty = v; const n = qtyNum(v); if (n != null) o.qn = n; else delete o.qn; } else { delete o.qty; delete o.qn; } }
 
 const ACT = {
   tab: a => { closeSheet(); S.day = null; S.tab = a; if (history.state && history.state.v) history.replaceState(null, ''); render(); window.scrollTo(0, 0); },
@@ -1826,9 +1860,9 @@ const ACT = {
   layer: a => { S.layer = a; render(); },
   moodMode: a => { S.moodMode = a; render(); },
   selDay: a => { if (S.sel === a) return ACT.openDay(a); S.sel = a; render(); },
-  openDay: a => { S.openSec = {}; S.day = a; S.sel = a; S.pending = null; history.pushState({ v: 'day' }, ''); render(); window.scrollTo(0, 0); },
+  openDay: a => { S.foodEdit = null; S.partEdit = null; S.openSec = {}; S.day = a; S.sel = a; S.pending = null; history.pushState({ v: 'day' }, ''); render(); window.scrollTo(0, 0); },
   back: () => { if (history.state && history.state.v === 'day') history.back(); else { S.day = null; render(); } },
-  dayNav: a => { S.foodEdit = null; S.prepTouched = false; S.foodDraft = ''; S.foodTime = ''; S.craveEdit = null; S.suppEdit = null; S.openSec = {}; S.day = addDays(S.day, Number(a)); S.sel = S.day; S.month = S.day.slice(0, 7); S.pending = null; render(); },
+  dayNav: a => { if (S.foodEdit != null) ACT.foodEditDone(true); S.foodEdit = null; S.partEdit = null; S.prepTouched = false; S.foodDraft = ''; S.foodTime = ''; S.craveEdit = null; S.suppEdit = null; S.openSec = {}; S.day = addDays(S.day, Number(a)); S.sel = S.day; S.month = S.day.slice(0, 7); S.pending = null; render(); },
   bleed: a => { editDay(S.day).bleed = a === 'אין' ? 'אין' : a; save(); render(); },
   extra: a => { toggleIn(editDay(S.day).extras, a); save(); render(); },
   sleepH: a => { const d = editDay(S.day); d.sleepH = d.sleepH === a ? '' : a; save(); render(); },
@@ -1847,21 +1881,30 @@ const ACT = {
   suppUntake: a => { delete editDay(S.day).supp[a]; S.suppEdit = null; save(); render(); },
   suppEditDone: () => { S.suppEdit = null; render(); },
   slot: a => { S.slot = a; render(); },
-  prep: a => { if (a === 'auto') S.prepTouched = false; else { S.prep = a; S.prepTouched = true; } render(); },
-  pPrep: a => { const p = S.pending; p.prep = a; const f = editDay(S.day).foods[p.idx]; if (f && f.name === p.name) f.prep = a; DATA.foodLib[p.name].lastPrep = a; save(); render(); },
-  foodQty: a => { S.foodQty = S.foodQty === a ? '' : a; render(); },
-  foodUnit: a => { S.foodUnit = S.foodUnit === a ? '' : a; render(); },
-  fQty: a => { const f = editDay(S.day).foods[S.foodEdit]; if (!f) return; delete f.amt; if (f.qty === a) { delete f.qty; delete f.qn; } else { f.qty = a; f.qn = qtyNum(a); } save(); render(); },
-  fUnit: a => { const f = editDay(S.day).foods[S.foodEdit]; if (!f) return; if (f.unit === a) delete f.unit; else { f.unit = a; if (DATA.foodLib[f.name]) DATA.foodLib[f.name].lastUnit = a; } save(); render(); },
-  foodEdit: a => { S.foodEdit = S.foodEdit === Number(a) ? null : Number(a); render(); },
-  foodEditDone: () => { S.foodEdit = null; render(); },
-  fPrep: a => { const f = editDay(S.day).foods[S.foodEdit]; if (!f) return; f.prep = a; if (DATA.foodLib[f.name]) DATA.foodLib[f.name].lastPrep = a; save(); render(); },
-  addFood: () => { const el = document.getElementById('foodIn'); addFoodName(el && el.value); S.foodDraft = ''; render(); const n = document.getElementById('foodIn'); if (n && !S.pending) n.focus(); },
-  quickFood: a => { addFoodName(a); render(); },
-  rmFood: a => { S.foodEdit = null; if (S.pending) S.pending = null; editDay(S.day).foods.splice(Number(a), 1); save(); render(); },
-  pcat: a => { toggleIn(S.pending.cats, a); render(); },
-  confirmFood: () => { DATA.foodLib[S.pending.name] = { cats: S.pending.cats.slice(), confirmed: true, lastPrep: S.pending.prep || undefined }; S.pending = null; save(); render(); toast('נשמר בספריית המאכלים'); },
-  skipFood: () => { S.pending = null; render(); },
+  fPrep: a => { const f = curFood(); if (!f) return; f.prep = f.prep === a ? '' : a; if (DATA.foodLib[f.name] && f.prep) DATA.foodLib[f.name].lastPrep = f.prep; save(); render(); },
+  fMethod: a => { const f = curFood(); if (!f) return; if (f.method === a) delete f.method; else f.method = a; save(); render(); },
+  fQty: a => { const f = curFood(); if (!f) return; setQty(f, f.qty === a ? '' : a); save(); render(); },
+  fUnit: a => { const f = curFood(); if (!f) return; if (f.unit === a) delete f.unit; else { f.unit = a; if (DATA.foodLib[f.name]) DATA.foodLib[f.name].lastUnit = a; } save(); render(); },
+  fCatsOpen: () => { S.fCatsOpen = true; render(); },
+  fSlot: a => { const f = curFood(); if (!f) return; f.slot = a; save(); render(); },
+  fNow: () => { const f = curFood(); if (!f) return; f.t = nowHM(); save(); render(); },
+  fCat: a => { const f = curFood(); if (!f) return; const lib = DATA.foodLib[f.name] = DATA.foodLib[f.name] || { cats: [] }; toggleIn(lib.cats, a); lib.confirmed = true; save(); render(); },
+  foodEdit: a => { const n = Number(a); if (S.foodEdit != null && S.foodEdit !== n) ACT.foodEditDone(true); S.foodEdit = S.foodEdit === n ? null : n; S.partEdit = null; S.fCatsOpen = false; S.partDraft = ''; render(); },
+  foodEditDone: quiet => { const f = curFood(); if (f) { const lib = DATA.foodLib[f.name]; if (lib) lib.confirmed = true; rememberMeal(f); save(); } if (quiet === true) return; S.foodEdit = null; S.partEdit = null; S.partDraft = ''; render(); },
+  addPart: () => { const f = curFood(); const el = document.getElementById('partIn'); const name = ((el && el.value) || '').trim().replace(/\s+/g, ' '); if (!f || !name) return;
+    // a new dish broken into ingredients: its groups come from them, not from guessing its name (rice noodles are not wheat)
+    const ml = DATA.foodLib[f.name]; if (!(f.parts || []).length && ml && !ml.confirmed) ml.cats = [];
+    if (!DATA.foodLib[name]) DATA.foodLib[name] = { cats: guessFoodCats(name).cats, confirmed: false };
+    const p = { name }; if (DATA.foodLib[name].lastUnit) p.unit = DATA.foodLib[name].lastUnit;
+    (f.parts = f.parts || []).push(p); S.partEdit = f.parts.length - 1; S.partDraft = ''; save(); render(); const n = document.getElementById('partIn'); if (n) n.focus(); },
+  partEdit: a => { const n = Number(a); if (S.partEdit === n) { const f = curFood(); const p = f && f.parts[n]; if (p && DATA.foodLib[p.name]) DATA.foodLib[p.name].confirmed = true; S.partEdit = null; } else S.partEdit = n; render(); },
+  rmPart: a => { const f = curFood(); if (!f) return; f.parts.splice(Number(a), 1); if (!f.parts.length) delete f.parts; S.partEdit = null; save(); render(); },
+  pQty: a => { const f = curFood(); const p = f && f.parts[S.partEdit]; if (!p) return; setQty(p, p.qty === a ? '' : a); save(); render(); },
+  pUnit: a => { const f = curFood(); const p = f && f.parts[S.partEdit]; if (!p) return; if (p.unit === a) delete p.unit; else { p.unit = a; if (DATA.foodLib[p.name]) DATA.foodLib[p.name].lastUnit = a; } save(); render(); },
+  partCat: a => { const f = curFood(); const p = f && f.parts[S.partEdit]; if (!p) return; const lib = DATA.foodLib[p.name] = DATA.foodLib[p.name] || { cats: [] }; toggleIn(lib.cats, a); lib.confirmed = true; save(); render(); },
+  addFood: () => { const el = document.getElementById('foodIn'); if (S.foodEdit != null) ACT.foodEditDone(true); addFoodName(el && el.value); S.foodDraft = ''; render(); },
+  quickFood: a => { if (S.foodEdit != null) ACT.foodEditDone(true); addFoodName(a); render(); },
+  rmFood: a => { const d = editDay(S.day); const f = d.foods[Number(a)]; if (f && !confirm('למחוק את "' + f.name + '" מהיום הזה?')) return; S.foodEdit = null; S.partEdit = null; d.foods.splice(Number(a), 1); save(); render(); },
   // cravings keep the time they were marked; tap a marked one to edit its time or undo
   crave: a => {
     const d = editDay(S.day); d.craveT = d.craveT || {};
@@ -1901,10 +1944,11 @@ const ACT = {
   cDelete: () => { if (!confirm('למחוק את הרשומה?')) return; const d = editDay(S.day); d.entries = d.entries.filter(x => x.id !== S.comp.id); save(); ACT.cClose(); render(); },
   cClose: () => { if (history.state && history.state.v === 'sheet') history.back(); else closeSheet(); },
   range: a => { S.range = Number(a); render(); },
+  dayStart: a => { DATA.settings.dayStart = Number(a); invalidate(); save(); render(); },
   export: () => IMG.all().then(images => {
     let wl = []; try { wl = JSON.parse(localStorage.getItem(WORKOUT_KEY) || '[]'); } catch (e) {}
     const out = { app: 'tracker', version: 1, exportedAt: new Date().toISOString(), data: DATA, workoutLog: wl, images,
-      legend: { suppTaken: 'supplement value = HH:MM when taken, or true if no time', scales: 'mood score 1-5 (overall mood, optional), energy 1-5 (separate energy entries; older mood entries may also carry energy), pain 0-10, severity קלה<בינונית<חזקה<קשה, bristol 1-7', foodCats: Object.fromEntries(FOOD_CATS) } };
+      legend: { suppTaken: 'supplement value = HH:MM when taken, or true if no time', scales: 'mood score 1-5 (overall mood, optional), energy 1-5 (separate energy entries; older mood entries may also carry energy), pain 0-10, severity קלה<בינונית<חזקה<קשה, bristol 1-7', dayBoundary: 'a day runs until ' + pad(dayStartH()) + ':00 the next morning; entry/supplement/food times earlier than that (00:00-' + pad(dayStartH()) + ':00) happened in the night AFTER that day, not its early morning', foodCats: Object.fromEntries(FOOD_CATS), foodItems: 'a food item may be a meal: parts = its ingredients (each with its own qty/unit and its own groups in foodLib), qty/unit on the item = the whole portion (e.g. 1 bowl); method = how it was cooked (מוקפץ adds oil, מטוגן adds fried+oil); prep = home / bought / eaten out. The groups of an item = foodLib[name].cats + its parts\' cats + method' } };
     download('tracker-' + todayS() + '.json', JSON.stringify(out, null, 1));
     try { localStorage.setItem('tracker.lastBackup', todayS()); } catch (e) {}
     if (S.tab === 'settings' && !S.day) setTimeout(render, 300);
@@ -1948,7 +1992,9 @@ document.addEventListener('input', e => {
   else if (k === 'foodDraft') S.foodDraft = el.value;
   else if (k === 'foodTime') S.foodTime = el.value;
   else if (k === 'foodQtyX') S.foodQty = el.value.trim();
-  else if (k === 'fQtyX') { const f = editDay(S.day).foods[S.foodEdit]; if (f) { delete f.amt; const v = el.value.trim(); if (v) { f.qty = v; f.qn = qtyNum(v); } else { delete f.qty; delete f.qn; } save(); } }
+  else if (k === 'fQtyX') { const f = curFood(); if (f) { setQty(f, el.value.trim()); save(); } }
+  else if (k === 'pQtyX') { const f = curFood(); const p = f && f.parts && f.parts[S.partEdit]; if (p) { setQty(p, el.value.trim()); save(); } }
+  else if (k === 'partDraft') S.partDraft = el.value;
   else if (k === 'fT') { const f = editDay(S.day).foods[S.foodEdit]; if (f) { if (el.value) f.t = el.value; else delete f.t; save(); } }
   else if (k === 'craveAt') { const d = editDay(S.day); d.craveT = d.craveT || {}; d.craveT[el.dataset.a] = el.value || true; save(); }
   else if (k === 'sleepNote') { editDay(S.day).sleepNote = el.value; save(); }
@@ -1996,7 +2042,7 @@ document.addEventListener('change', e => {
 });
 window.addEventListener('popstate', () => {
   if ($sheet.classList.contains('open')) { closeSheet(); return; }
-  if (S.day) { flushNote(); S.day = null; S.pending = null; render(); }
+  if (S.day) { flushNote(); if (S.foodEdit != null) { ACT.foodEditDone(true); S.foodEdit = null; } S.day = null; S.pending = null; render(); }
 });
 function flushNote() { const el = document.getElementById('dayNote'); if (el && S.day && el.value !== getDay(S.day).note) { clearTimeout(noteTimer); editDay(S.day).note = el.value; save(); } }
 window.addEventListener('pagehide', flushNote);
