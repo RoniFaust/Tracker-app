@@ -109,7 +109,7 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
-const APP_VERSION = '17.11יא';
+const APP_VERSION = '17.11יג';
 const AMOUNTS = ['½', '1', '1½', '2', '3'];
 // units: [singular, plural]
 const UNITS = [['יחידה', 'יחידות'], ['גרם', 'גרם'], ['קובייה', 'קוביות'], ['פרוסה', 'פרוסות'], ['כף', 'כפות'], ['כפית', 'כפיות'], ['כוס', 'כוסות'],
@@ -504,8 +504,19 @@ const RAMP = {
 };
 const LAYERS = [
   ['mood', 'מצב רוח'], ['energy', 'אנרגיה'], ['pain', 'כאב'], ['belly', 'בטן'], ['sym', 'תסמינים'], ['food', 'אוכל'],
-  ['fit', 'כושר'], ['practice', 'תרגול'], ['cycle', 'מחזור'], ['supp', 'תוספים'], ['sleep', 'שינה']
+  ['nutr', 'תזונה'], ['fit', 'כושר'], ['practice', 'תרגול'], ['cycle', 'מחזור'], ['supp', 'תוספים'], ['sleep', 'שינה']
 ];
+// nutrition layer: one shade per amount (more = darker), neutral — not "good" or "bad"
+const NUT_RAMP = ['#E3EEF0', '#B7D3D8', '#7FAFB8', '#4A8693', '#25596A'];
+const NUT_PCT = [[50, 'פחות מחצי מהיעד'], [80, 'חצי עד 80%'], [95, '80% עד 95%'], [110, '95% עד 110%'], [1e9, 'מעל 110%']];
+const NUT_ABS = { c: [[100, 'עד 100 ג׳'], [150, '100–149'], [200, '150–199'], [250, '200–249'], [1e9, '250+']], f: [[40, 'עד 40 ג׳'], [60, '40–59'], [80, '60–79'], [100, '80–99'], [1e9, '100+']] };
+function nutBins(k) { const t = Number(nutTargets()[k]); return t ? { pct: true, t, bins: NUT_PCT } : { pct: false, bins: NUT_ABS[k] || (k === 'kcal' ? [[1200, 'עד 1,200'], [1500, '1,200–1,499'], [1800, '1,500–1,799'], [2100, '1,800–2,099'], [1e9, '2,100+']] : [[30, 'עד 30 ג׳'], [60, '30–59'], [90, '60–89'], [120, '90–119'], [1e9, '120+']]) }; }
+function nutDayColor(s) {
+  const d = DATA.days[s]; if (!d || !(d.foods || []).length) return null;
+  const r = dayNut(d); if (!r.n) return null;
+  const k = S.nutK || 'kcal', B = nutBins(k); const v = B.pct ? r.mid[k] / B.t * 100 : r.mid[k];
+  return NUT_RAMP[B.bins.findIndex(b => v < b[0])];
+}
 function effLayer() { return S.layer === 'mood' && S.moodMode === 'kind' ? 'emo' : S.layer; }
 function layerColor(L, s) {
   const m = metrics(s);
@@ -517,6 +528,7 @@ function layerColor(L, s) {
     case 'belly': return m.belly ? RAMP.belly[m.belly - 1] : null;
     case 'sym': return m.sym ? RAMP.sym[m.sym - 1] : null;
     case 'food': return m.feel ? MOOD_DIV[m.feel - 1] : null;
+    case 'nutr': return nutDayColor(s);
     case 'fit': { const v = m.fit; if (!v) return null; return v < 30 ? '#C9D8EC' : v < 45 ? '#8FAED6' : '#3F6FA8'; }
     case 'practice': { if (!m.practiceN) return null; const v = m.practice; return v < 5 ? '#E6DDEE' : v < 15 ? '#B9A6C8' : v < 30 ? '#8B6BA8' : '#5B3A7A'; }
     case 'cycle': { const c = cycleOf(s); return c ? PHASES[c.phase][1] : null; }
@@ -534,6 +546,7 @@ function layerLegend(L) {
     case 'belly': return RAMP.belly.map((c, i) => [c, SEVERITY[i]]);
     case 'sym': return RAMP.sym.map((c, i) => [c, SEVERITY[i]]);
     case 'food': return MOOD_DIV.map((c, i) => [c, i === 0 ? 'הרגשתי רע' : i === 4 ? 'הרגשתי מצוין' : String(i + 1)]);
+    case 'nutr': return nutBins(S.nutK || 'kcal').bins.map((b, i) => [NUT_RAMP[i], b[1]]);
     case 'fit': return [['#C9D8EC', 'עד 30 דק׳'], ['#8FAED6', '30–44'], ['#3F6FA8', '45+']];
     case 'practice': return [['#E6DDEE', 'עד 5 דק׳'], ['#B9A6C8', '5–14'], ['#8B6BA8', '15–29'], ['#5B3A7A', '30+']];
     case 'cycle': return Object.values(PHASES).map(p => [p[1], p[0]]);
@@ -548,6 +561,7 @@ const LAYER_NOTE = {
   energy: 'ממוצע רשומות האנרגיה של היום',
   pain: 'הכאב החזק ביותר שתועד באותו יום', belly: 'תסמין הבטן החזק ביותר שתועד באותו יום',
   sym: 'התסמין הכללי החזק ביותר שתועד באותו יום', food: 'הדירוג "איך הרגשתי עם האוכל"',
+  nutr: 'הערכה מהאוכל שנרשם · יום שחסרים בו ערכים או כמויות מסומן ב-?',
   fit: 'נשאב אוטומטית מ-Workout Pro', practice: 'סך דקות התרגול מארגז הכלים', cycle: 'מחושב מימי הדימום · ימים עתידיים הם תחזית',
   supp: 'אחוז המנות שנלקחו מתוך מה שמתוכנן לאותו יום', sleep: 'שעות שינה בלילה שלפני'
 };
@@ -568,6 +582,7 @@ function renderCal() {
     const c = cycleOf(s);
     let inner = `<span>${d}</span>`;
     if (L === 'mood' && m.moodSeq.length > 1) inner = `<span class="cal-strip" aria-hidden="true">${m.moodSeq.slice(0, 8).map(v => `<i style="background:${MOOD_DIV[v - 1]}"></i>`).join('')}</span>` + inner;
+    if (L === 'nutr' && bg && dayNut(DATA.days[s]).missing.length) inner += '<span aria-hidden="true" style="position:absolute;top:3px;left:6px;font-size:11px;font-weight:700;opacity:.8">?</span>';
     if (L !== 'cycle') {
       if (isBleed(m.bleed)) inner += '<span class="cal-bleed" aria-hidden="true"></span>';
       else if (s > t && c && c.phase === 'men') inner += '<span class="cal-bleed pred" aria-hidden="true"></span>';
@@ -588,7 +603,8 @@ function renderCal() {
     <div class="small muted" style="font-weight:600;margin:8px 0 6px">צביעה לפי</div>
     <div class="layers">${LAYERS.map(l => chip(l[1], S.layer === l[0], 'layer', l[0])).join('')}</div>
     ${S.layer === 'mood' ? `<div class="seg" style="margin-bottom:8px"><button aria-pressed="${S.moodMode === 'score'}" data-act="moodMode" data-a="score">ציון</button><button aria-pressed="${S.moodMode === 'kind'}" data-act="moodMode" data-a="kind">סוג רגש</button></div>` : ''}
-    <div class="xs muted" style="margin-bottom:6px">${LAYER_NOTE[L]}</div>
+    ${S.layer === 'nutr' ? `<div class="seg" style="margin-bottom:8px">${NUT_KEYS.map(([k, l]) => `<button aria-pressed="${(S.nutK || 'kcal') === k}" data-act="nutK" data-a="${k}">${l}</button>`).join('')}</div>` : ''}
+    <div class="xs muted" style="margin-bottom:6px">${LAYER_NOTE[L]}${L === 'nutr' && nutBins(S.nutK || 'kcal').pct ? ' · לפי היעד היומי (' + fmtN(nutBins(S.nutK || 'kcal').t) + ')' : ''}</div>
     <div class="wrap" style="gap:6px 12px;margin-bottom:12px">${legend}</div>
     <div class="grid7" style="margin-bottom:6px">${DAY_LETTERS.map(l => `<div class="xs muted" style="text-align:center;font-weight:700">${l}</div>`).join('')}</div>
     <div class="grid7">${cells}</div>
@@ -1670,16 +1686,20 @@ function gramsOf(name, o) {
   // "גרם" with no number says nothing about the amount (it would count as 1 g) — treat it as no unit
   const unit = o.unit === 'גרם' && !hasQty ? '' : o.unit;
   let grams = null, unc = 0;
-  if (unit === 'גרם') { grams = n; unc = 0.1; }
+  if (unit === 'גרם') { grams = n; unc = 0.02; } // weighed
   else if (unit && g[unit]) { grams = n * g[unit]; unc = 0.2; }
   else if (!unit && g['מנה']) { grams = n * g['מנה']; unc = 0.35; }
   else if (!unit && g['יחידה']) { grams = n * g['יחידה']; unc = 0.25; }
   else if (unit && UNIT_G_FALLBACK[unit]) { grams = n * UNIT_G_FALLBACK[unit]; unc = 0.35; }
   if (grams == null) return null;
   // no amount written: if the name itself says how much ("פרוסת…", "2 קוביות…", one yogurt) the portion is fairly known
-  if (!hasQty) unc = Math.max(unc, lib.portionInName ? 0.25 : 0.5);
-  return { g: grams, unc };
+  // (a packaged single item — a bar, a yogurt cup — is a known weight)
+  if (!hasQty) unc = lib.portionInName ? (lib.nutSrc === 'label' || lib.nutSrc === 'user' ? 0.03 : Math.max(unc, 0.25)) : Math.max(unc, 0.5);
+  return { g: grams, unc, noQty: !hasQty && !lib.portionInName };
 }
+// how sure the values per 100 g are: her own / a label ≈ exact, USDA ≈ close, my estimate (home dishes, eaten out) less
+function valUnc(name) { const l = DATA.foodLib[name] || {}; if (l.nutSrc === 'user' || l.nutSrc === 'label') return 0.03; if (l.nutNote === 'לפי USDA') return 0.05; return 0.15; }
+const combUnc = (a, b) => Math.sqrt(a * a + b * b);
 function scaleNut(nut, grams) { const o = {}; NUT_KEYS.forEach(([k]) => { o[k] = (Number(nut[k]) || 0) * grams / 100; }); return o; }
 // estimate for one eaten item: {v, unc, partial, missing:[names]} or null
 function itemNut(f) {
@@ -1689,17 +1709,18 @@ function itemNut(f) {
   // the dish as a whole: when it has its own values and no measured ingredients (e.g. a bowl eaten out)
   if (hasNut(f.name) && (!parts.length || !partsQ.length || (f.qty != null && !partsQ.length))) {
     const gr = gramsOf(f.name, f); if (!gr) return { v: null, missing: [f.name + ' (אין גרמים ליחידה)'] };
-    return { v: scaleNut(lib.nut, gr.g), unc: gr.unc, partial: false, missing: [] };
+    return { v: scaleNut(lib.nut, gr.g), unc: combUnc(gr.unc, valUnc(f.name)), partial: false, missing: [], noQty: gr.noQty, estVals: valUnc(f.name) > 0.1 };
   }
   if (!parts.length) return { v: null, missing: [f.name] };
   const v = {}; NUT_KEYS.forEach(([k]) => { v[k] = 0; });
-  let w = 0, uncSum = 0, got = 0; const missing = [];
+  let w = 0, uncSum = 0, got = 0, noQty = false, estVals = false; const missing = [];
   const hasListedOil = parts.some(p => ((DATA.foodLib[p.name] || {}).cats || []).includes('oil') && /שמן|חמאה/.test(p.name));
   parts.forEach(p => {
     if (!hasNut(p.name)) { missing.push(p.name); return; }
     const gr = gramsOf(p.name, p); if (!gr) { missing.push(p.name); return; }
     const pv = scaleNut(DATA.foodLib[p.name].nut, gr.g);
-    NUT_KEYS.forEach(([k]) => { v[k] += pv[k]; }); w += pv.kcal; uncSum += pv.kcal * gr.unc; got++;
+    const u = combUnc(gr.unc, valUnc(p.name)); if (gr.noQty) noQty = true; if (valUnc(p.name) > 0.1 && pv.kcal > 20) estVals = true;
+    NUT_KEYS.forEach(([k]) => { v[k] += pv[k]; }); w += pv.kcal; uncSum += pv.kcal * u; got++;
     if (PART_OIL_FRAC[p.method] && !hasListedOil) { const ov = scaleNut(OIL_100, gr.g * PART_OIL_FRAC[p.method]); NUT_KEYS.forEach(([k]) => { v[k] += ov[k]; }); w += ov.kcal; uncSum += ov.kcal * 0.6; }
   });
   if (!got) return { v: null, missing };
@@ -1709,19 +1730,22 @@ function itemNut(f) {
   if (oilG && !hasListedOil && !parts.some(p => PART_OIL_FRAC[p.method])) {
     const ov = scaleNut(OIL_100, oilG); NUT_KEYS.forEach(([k]) => { v[k] += ov[k]; }); w += ov.kcal; uncSum += ov.kcal * 0.6;
   }
-  return { v, unc: w ? uncSum / w : 0.3, partial: missing.length > 0, missing };
+  return { v, unc: w ? uncSum / w : 0.3, partial: missing.length > 0, missing, noQty, estVals };
 }
 function dayNut(d) {
   const lo = {}, hi = {}, mid = {}; NUT_KEYS.forEach(([k]) => { lo[k] = hi[k] = mid[k] = 0; });
   let n = 0; const missing = [];
   (d.foods || []).forEach(f => {
     const r = itemNut(f);
+    if (r && r.v && r.noQty) missing.push(f.name + ' (בלי כמות)');
     if (r && r.v) { n++; NUT_KEYS.forEach(([k]) => { mid[k] += r.v[k]; lo[k] += r.v[k] * (1 - r.unc); hi[k] += r.v[k] * (1 + r.unc); }); }
     if (r && r.missing.length) missing.push(...r.missing);
   });
   return { lo, hi, mid, n, total: (d.foods || []).length, missing: [...new Set(missing)] };
 }
 const fmtN = v => Math.round(v).toLocaleString('en-US');
+const roundK = (v, k) => k === 'kcal' ? Math.round(v / 10) * 10 : (v < 10 ? Math.round(v * 10) / 10 : Math.round(v));
+const fmtV = (v, k) => roundK(v, k).toLocaleString('en-US');
 function fmtRange(lo, hi, k) {
   const r = k === 'kcal' ? (x => Math.round(x / 10) * 10) : Math.round;
   const a = r(lo), b = r(hi);
@@ -1738,11 +1762,14 @@ function nutSummaryHtml(d) {
   const rem = k => { const t = Number(T[k]); if (!t) return ''; const a = t - s.hi[k], b = t - s.lo[k];
     if (b <= 0) return `עברת את היעד בערך ב-${fmtRange(-b, -a, k)}`;
     return `נשאר בערך ${fmtRange(Math.max(0, a), b, k)} מתוך ${fmtN(t)}`; };
+  const spread = s.mid.kcal ? (s.hi.kcal - s.lo.kcal) / 2 / s.mid.kcal : 0;
+  const left = k => { const t = Number(T[k]); if (!t) return ''; const x = t - s.mid[k]; return x >= 0 ? `נשאר כ-${fmtV(x, k)}` : `מעל היעד בכ-${fmtV(-x, k)}`; };
   return `<div style="margin-bottom:10px;padding:10px 12px;border-radius:12px;background:#F6F0FA">
-    <div class="xs muted">היום עד עכשיו (הערכה)</div>
-    <div style="font-weight:700;font-size:18px">${fmtRange(s.lo.kcal, s.hi.kcal, 'kcal')} קק״ל</div>
-    ${rem('kcal') ? `<div class="small" style="color:var(--accent);font-weight:700">${rem('kcal')}</div>` : ''}
-    <div class="small" style="margin-top:4px">${NUT_KEYS.slice(1).map(([k, l, u]) => `${l} ${fmtRange(s.lo[k], s.hi[k], k)} ${u}${T[k] ? ` <span class="muted">(${rem(k).replace('נשאר בערך ', 'נשאר ').replace(/ מתוך .*/, '')})</span>` : ''}`).join(' · ')}</div>
+    <div class="xs muted">היום עד עכשיו</div>
+    <div style="font-weight:700;font-size:18px">כ-${fmtV(s.mid.kcal, 'kcal')} קק״ל</div>
+    ${T.kcal ? `<div class="small" style="color:var(--accent);font-weight:700">${left('kcal')} מתוך ${fmtN(T.kcal)}</div>` : ''}
+    <div class="small" style="margin-top:4px">${NUT_KEYS.slice(1).map(([k, l, u]) => `${l} ${fmtV(s.mid[k], k)} ${u}${T[k] ? ` <span class="muted">(${left(k)})</span>` : ''}`).join(' · ')}</div>
+    ${spread > 0.12 ? `<div class="xs muted" style="margin-top:4px">טווח אפשרי: ${fmtRange(s.lo.kcal, s.hi.kcal, 'kcal')} קק״ל, כי בחלק מהפריטים הכמות או הערכים משוערים</div>` : ''}
     <div class="xs muted" style="margin-top:4px">${s.n} מתוך ${s.total} פריטים עם ערכים${s.missing.length ? ' · חסרים: ' + esc(s.missing.join(', ')) : ''}</div>
   </div>`;
 }
@@ -1764,7 +1791,7 @@ function itemNutLine(f) {
   const r = itemNut(f);
   const noQty = f.qty == null && f.qn == null && f.amt == null && !(f.parts || []).some(p => p.qty != null || p.qn != null);
   const portion = noQty && hasNut(f.name) ? gramsOf(f.name, f) : null;
-  if (r && r.v) return `<div class="xs muted" style="margin-top:4px">בערך ${fmtRange(r.v.kcal * (1 - r.unc), r.v.kcal * (1 + r.unc), 'kcal')} קק״ל · חלבון ${fmtRange(r.v.p * (1 - r.unc), r.v.p * (1 + r.unc), 'p')} ג׳${r.partial ? ' · בלי: ' + esc(r.missing.join(', ')) : ''}</div>${noQty && !(DATA.foodLib[f.name] || {}).portionInName ? `<div class="xs" style="margin-top:2px;color:#8A6A12">לא נרשמה כמות, אז החישוב לפי מנה רגילה${portion ? ' (' + fmtN(portion.g) + ' ג׳)' : ''}. כדאי לבחור כמות.</div>` : ''}`;
+  if (r && r.v) return `<div class="xs muted" style="margin-top:4px">כ-${fmtV(r.v.kcal, 'kcal')} קק״ל · חלבון ${fmtV(r.v.p, 'p')} ג׳ · פחמימה ${fmtV(r.v.c, 'c')} ג׳ · שומן ${fmtV(r.v.f, 'f')} ג׳${r.partial ? ' · בלי: ' + esc(r.missing.join(', ')) : ''}${r.unc > 0.12 ? `<br>טווח אפשרי ${fmtRange(r.v.kcal * (1 - r.unc), r.v.kcal * (1 + r.unc), 'kcal')}, כי ${r.noQty ? 'לא נרשמה כמות' : r.estVals ? 'חלק מהערכים ל-100 גרם הם הערכה (אוכל ביתי או מבחוץ)' : 'הכמות משוערת (כף, חופן…)'}` : ''}</div>${noQty && !(DATA.foodLib[f.name] || {}).portionInName ? `<div class="xs" style="margin-top:2px;color:#8A6A12">לא נרשמה כמות, אז החישוב לפי מנה רגילה${portion ? ' (' + fmtN(portion.g) + ' ג׳)' : ''}. כדאי לבחור כמות.</div>` : ''}`;
   return `<div class="xs muted" style="margin-top:4px">אין עדיין ערכים תזונתיים${r && r.missing.length ? ' ל: ' + esc(r.missing.join(', ')) : ''}</div>`;
 }
 // importing the values file I prepare: {app:'tracker-nutrition', foods:{name:{nut, g}}}
@@ -2362,6 +2389,7 @@ const ACT = {
   month: a => { const [y, m] = S.month.split('-').map(Number); const d = new Date(y, m - 1 + Number(a), 1); S.month = d.getFullYear() + '-' + pad(d.getMonth() + 1); render(); },
   layer: a => { S.layer = a; render(); },
   moodMode: a => { S.moodMode = a; render(); },
+  nutK: a => { S.nutK = a; render(); },
   selDay: a => { if (S.sel === a) return ACT.openDay(a); S.sel = a; render(); },
   openDay: a => { S.foodEdit = null; S.partEdit = null; S.openSec = {}; S.day = a; S.sel = a; S.pending = null; history.pushState({ v: 'day' }, ''); render(); window.scrollTo(0, 0); },
   back: () => { if (history.state && history.state.v === 'day') history.back(); else { S.day = null; render(); } },
@@ -2602,6 +2630,8 @@ load();
   DATA.settings.merge1711 = true; save();
 })();
 if (fillNutBase()) save();
+// "גרם" chosen without a number (left over from an older version) means no amount
+(function () { let ch = 0; Object.values(DATA.days).forEach(d => (d.foods || []).forEach(f => [f].concat(f.parts || []).forEach(o => { if (o.unit === 'גרם' && o.qty == null && o.qn == null && o.amt == null) { delete o.unit; ch++; } }))); if (ch) save(); })();
 render();
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('tracker-sw.js').catch(() => {});
 </script>
