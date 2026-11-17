@@ -109,7 +109,7 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
-const APP_VERSION = '17.11ח';
+const APP_VERSION = '17.11יא';
 const AMOUNTS = ['½', '1', '1½', '2', '3'];
 // units: [singular, plural]
 const UNITS = [['יחידה', 'יחידות'], ['גרם', 'גרם'], ['קובייה', 'קוביות'], ['פרוסה', 'פרוסות'], ['כף', 'כפות'], ['כפית', 'כפיות'], ['כוס', 'כוסות'],
@@ -304,6 +304,22 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 /* ---------- Workout Pro (read only) ---------- */
 const AREA_HE = { glutes: 'ישבן', quads: 'ירך קדמית', back: 'גב', core: 'בטן וליבה', upper_body: 'פלג גוף עליון', chest: 'חזה', shoulders: 'כתפיים', arms: 'זרועות' };
 let _workouts = null;
+// which day a workout belongs to: when it STARTED, with the night until dayStart counted as the evening before
+function workoutDay(w) {
+  if (w.logged && w.time) {
+    const L = new Date(w.logged);
+    if (!isNaN(L)) {
+      const [h, m] = w.time.split(':').map(Number);
+      let start;
+      if (w.date === ymd(L)) { start = new Date(L); start.setHours(h, m, 0, 0); if (start > L) start.setDate(start.getDate() - 1); } // 23:40 saved at 00:10 → yesterday
+      else { start = parseD(w.date); start.setHours(h, m, 0, 0); } // she picked another date herself
+      start.setHours(start.getHours() - dayStartH());
+      return ymd(start);
+    }
+  }
+  return isNightT(w.end || w.time) ? addDays(w.date, -1) : w.date;
+}
+function wkKey(w) { return [w.date, w.time || '', w.totalSeconds || 0, w.name || ''].join('|'); }
 function workoutsByDate() {
   if (_workouts) return _workouts;
   _workouts = {};
@@ -315,9 +331,13 @@ function workoutsByDate() {
     const areas = new Set();
     (w.exercises || []).forEach(ex => (ex.areas || []).forEach(a => areas.add(AREA_HE[a] || a)));
     // the workout app dates a workout by when it ended; one that ended after midnight belongs to the evening before
-    const wd = isNightT(w.end || w.time) ? addDays(w.date, -1) : w.date;
+    let wd = workoutDay(w);
+    const key = wkKey(w); const mv = (DATA.workoutMove || {})[key];
+    // a manual entry dated today with a start time still ahead (23:40 typed at 00:10) happened last night — remembered once seen
+    if (!mv && !w.end && w.time && w.date === ymd(new Date()) && w.time > nowHM() && !isNightT(w.time)) { DATA.workoutMove = DATA.workoutMove || {}; DATA.workoutMove[key] = addDays(w.date, -1); try { localStorage.setItem(KEY, JSON.stringify(DATA)); } catch (e) {} }
+    if ((DATA.workoutMove || {})[key]) wd = DATA.workoutMove[key];
     (_workouts[wd] = _workouts[wd] || []).push({
-      name: w.name || 'אימון', min: Math.round((w.totalSeconds || 0) / 60), cardio: w.kind === 'cardio', areas: [...areas], time: w.time || '', end: w.end || ''
+      name: w.name || 'אימון', min: Math.round((w.totalSeconds || 0) / 60), cardio: w.kind === 'cardio', areas: [...areas], time: w.time || '', end: w.end || '', key, orig: w.date, moved: wd !== w.date
     });
   });
   Object.values(_workouts).forEach(list => list.sort((a, b) => tKey(a.time || '99').localeCompare(tKey(b.time || '99'))));
@@ -834,7 +854,10 @@ function fitCard(s) {
   const ws = workoutsByDate()[s] || [];
   return `<div><div class="xs" style="font-weight:700;color:#2F5A8F">נשאב אוטומטית מ-Workout Pro</div>
     ${ws.length ? ws.map(w => `<div class="row" style="gap:12px;margin-top:10px"><span style="width:44px;height:44px;border-radius:12px;background:#3F6FA8;color:#fff;display:flex;align-items:center;justify-content:center;flex:0 0 auto">${ICON.dumbbell}</span>
-      <div><div style="font-weight:700">${esc(w.name)} · ${w.min} דק׳${w.time ? ` <span class="small" style="font-weight:600;color:var(--ink2)">· ${esc(w.time)}${w.end ? '–' + esc(w.end) : ''}</span>` : ''}</div>${w.areas.length ? `<div class="small" style="color:var(--ink2)">${esc(w.areas.join(', '))}</div>` : ''}</div></div>`).join('')
+      <div><div style="font-weight:700">${esc(w.name)} · ${w.min} דק׳${w.time ? ` <span class="small" style="font-weight:600;color:var(--ink2)">· ${esc(w.time)}${w.end ? '–' + esc(w.end) : ''}</span>` : ''}</div>${w.areas.length ? `<div class="small" style="color:var(--ink2)">${esc(w.areas.join(', '))}</div>` : ''}
+        <div class="row" style="gap:6px;margin-top:4px;flex-wrap:wrap">${w.moved ? `<span class="xs muted">ביומן האימונים: ${esc(fmtShort ? fmtShort(w.orig) : w.orig)}</span>` : ''}
+          <button class="chip" style="min-height:30px;font-size:12px;padding:0 10px" data-act="wkMove" data-a="${esc(w.key)}::${addDays(s, -1)}">ליום הקודם</button>
+          <button class="chip" style="min-height:30px;font-size:12px;padding:0 10px" data-act="wkMove" data-a="${esc(w.key)}::${addDays(s, 1)}">ליום הבא</button></div></div></div>`).join('')
       : '<div class="small" style="color:var(--ink2);margin-top:8px">לא תועד אימון ביום הזה.</div>'}
   </div>`;
 }
@@ -1644,12 +1667,14 @@ function gramsOf(name, o) {
   const lib = DATA.foodLib[name] || {}; const g = lib.g || {};
   let n = o.qn != null ? o.qn : (o.qty != null ? qtyNum(o.qty) : (o.amt != null ? o.amt : null));
   const hasQty = n != null; if (!hasQty) n = 1;
+  // "גרם" with no number says nothing about the amount (it would count as 1 g) — treat it as no unit
+  const unit = o.unit === 'גרם' && !hasQty ? '' : o.unit;
   let grams = null, unc = 0;
-  if (o.unit === 'גרם') { grams = n; unc = 0.1; }
-  else if (o.unit && g[o.unit]) { grams = n * g[o.unit]; unc = 0.2; }
-  else if (!o.unit && g['מנה']) { grams = n * g['מנה']; unc = 0.35; }
-  else if (!o.unit && g['יחידה']) { grams = n * g['יחידה']; unc = 0.25; }
-  else if (o.unit && UNIT_G_FALLBACK[o.unit]) { grams = n * UNIT_G_FALLBACK[o.unit]; unc = 0.35; }
+  if (unit === 'גרם') { grams = n; unc = 0.1; }
+  else if (unit && g[unit]) { grams = n * g[unit]; unc = 0.2; }
+  else if (!unit && g['מנה']) { grams = n * g['מנה']; unc = 0.35; }
+  else if (!unit && g['יחידה']) { grams = n * g['יחידה']; unc = 0.25; }
+  else if (unit && UNIT_G_FALLBACK[unit]) { grams = n * UNIT_G_FALLBACK[unit]; unc = 0.35; }
   if (grams == null) return null;
   // no amount written: if the name itself says how much ("פרוסת…", "2 קוביות…", one yogurt) the portion is fairly known
   if (!hasQty) unc = Math.max(unc, lib.portionInName ? 0.25 : 0.5);
@@ -1737,7 +1762,9 @@ function nutEditorHtml(name, units) {
 }
 function itemNutLine(f) {
   const r = itemNut(f);
-  if (r && r.v) return `<div class="xs muted" style="margin-top:4px">בערך ${fmtRange(r.v.kcal * (1 - r.unc), r.v.kcal * (1 + r.unc), 'kcal')} קק״ל · חלבון ${fmtRange(r.v.p * (1 - r.unc), r.v.p * (1 + r.unc), 'p')} ג׳${r.partial ? ' · בלי: ' + esc(r.missing.join(', ')) : ''}</div>`;
+  const noQty = f.qty == null && f.qn == null && f.amt == null && !(f.parts || []).some(p => p.qty != null || p.qn != null);
+  const portion = noQty && hasNut(f.name) ? gramsOf(f.name, f) : null;
+  if (r && r.v) return `<div class="xs muted" style="margin-top:4px">בערך ${fmtRange(r.v.kcal * (1 - r.unc), r.v.kcal * (1 + r.unc), 'kcal')} קק״ל · חלבון ${fmtRange(r.v.p * (1 - r.unc), r.v.p * (1 + r.unc), 'p')} ג׳${r.partial ? ' · בלי: ' + esc(r.missing.join(', ')) : ''}</div>${noQty && !(DATA.foodLib[f.name] || {}).portionInName ? `<div class="xs" style="margin-top:2px;color:#8A6A12">לא נרשמה כמות, אז החישוב לפי מנה רגילה${portion ? ' (' + fmtN(portion.g) + ' ג׳)' : ''}. כדאי לבחור כמות.</div>` : ''}`;
   return `<div class="xs muted" style="margin-top:4px">אין עדיין ערכים תזונתיים${r && r.missing.length ? ' ל: ' + esc(r.missing.join(', ')) : ''}</div>`;
 }
 // importing the values file I prepare: {app:'tracker-nutrition', foods:{name:{nut, g}}}
@@ -2314,7 +2341,7 @@ function addFoodName(name) {
   // filled from what this food had last time; everything is editable in the card that opens
   const item = { name, slot: S.slot, prep: lastPrepOf(name) || '' };
   if (S.foodTime) item.t = S.foodTime;
-  if (lib.lastUnit) item.unit = lib.lastUnit;
+  if (lib.lastUnit && lib.lastUnit !== 'גרם') item.unit = lib.lastUnit;
   if (lib.parts && lib.parts.length) { item.parts = lib.parts.map(p => Object.assign({}, p)); if (lib.lastMethod) item.method = lib.lastMethod; }
   d.foods.push(item);
   S.foodEdit = d.foods.length - 1; S.partEdit = null; S.fCatsOpen = false; S.partDraft = '';
@@ -2368,6 +2395,7 @@ const ACT = {
   dupNotP: a => { const f = curFood(); const p = f && f.parts && f.parts[S.partEdit]; if (!p) return; notDup(p.name, a); save(); render(); },
   dupMerge: a => { const [i, n] = split2(a); const g = dupGroups()[Number(i)]; if (!g) return; if (!confirm(`לאחד את ${g.length} השמות לשם "${n}"? כל הרישומים יעברו אליו.`)) return; mergeFoods(g, n); save(); render(); toast('אוחד'); },
   dupNo: a => { const g = dupGroups()[Number(a)]; if (!g) return; g.forEach(x => g.forEach(y => { if (x !== y) notDup(x, y); })); save(); render(); },
+  wkMove: a => { const i = a.lastIndexOf('::'); const key = a.slice(0, i), to = a.slice(i + 2); DATA.workoutMove = DATA.workoutMove || {}; if (key.split('|')[0] === to) delete DATA.workoutMove[key]; else DATA.workoutMove[key] = to; invalidate(); save(); render(); toast('האימון הועבר'); },
   fCatsOpen: () => { S.fCatsOpen = true; render(); },
   fSlot: a => { const f = curFood(); if (!f) return; f.slot = a; save(); render(); },
   fNow: () => { const f = curFood(); if (!f) return; f.t = nowHM(); save(); render(); },
@@ -2379,7 +2407,7 @@ const ACT = {
     const ml = DATA.foodLib[f.name]; if (!(f.parts || []).length && ml && !ml.confirmed) ml.cats = [];
     if (!DATA.foodLib[name]) DATA.foodLib[name] = { cats: guessFoodCats(name).cats, confirmed: false };
     applyNutBase(name);
-    const p = { name }; if (DATA.foodLib[name].lastUnit) p.unit = DATA.foodLib[name].lastUnit;
+    const p = { name }; if (DATA.foodLib[name].lastUnit && DATA.foodLib[name].lastUnit !== 'גרם') p.unit = DATA.foodLib[name].lastUnit;
     (f.parts = f.parts || []).push(p); S.partEdit = f.parts.length - 1; S.partDraft = ''; save(); if (arguments[0] === true) return; render(); },
   partEdit: a => { const n = Number(a); if (S.partEdit === n) { const f = curFood(); const p = f && f.parts[n]; if (p && DATA.foodLib[p.name]) DATA.foodLib[p.name].confirmed = true; S.partEdit = null; } else S.partEdit = n; render(); },
   rmPart: a => { const f = curFood(); if (!f) return; f.parts.splice(Number(a), 1); if (!f.parts.length) delete f.parts; S.partEdit = null; save(); render(); },
