@@ -109,7 +109,7 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
-const APP_VERSION = '18.11ד';
+const APP_VERSION = '19.11ב';
 const AMOUNTS = ['½', '1', '1½', '2', '3'];
 // units: [singular, plural]
 const UNITS = [['יחידה', 'יחידות'], ['גרם', 'גרם'], ['קובייה', 'קוביות'], ['פרוסה', 'פרוסות'], ['כף', 'כפות'], ['כפית', 'כפיות'], ['כוס', 'כוסות'],
@@ -640,7 +640,7 @@ function nutSelHtml(s) {
     <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
       ${kcalTile}${atLeast('p', 'חלבון')}${atLeast('fib', 'סיבים')}${share('c', 'פחמימה')}${share('f', 'שומן')}
       <div class="stat"><span>פריטים עם ערכים</span><b>${r.n}/${r.total}</b></div>
-    </div>`;
+    </div>${avgLineHtml(s)}`;
 }
 function selCard(s) {
   const m = metrics(s), c = cycleOf(s), d = getDay(s);
@@ -822,7 +822,9 @@ function qtyPicker(q, unit, actQ, actU, inp) {
       <input class="input" type="text" inputmode="text" style="width:96px;min-height:40px;background:#fff" placeholder="אחר: 30 / 5-7" value="${esc(q && !AMOUNTS.includes(q) ? q : '')}" data-input="${inp}" aria-label="כמות אחרת או טווח"></div>
     <div class="wrap" style="margin-top:6px">${UNITS.map(u => chip(u[0], unit === u[0], actU, u[0])).join('')}</div>`;
 }
-function partsText(f) { return (f.parts || []).map(p => (qtyText(p) ? qtyText(p) + ' ' : '') + p.name + (p.method ? ' ' + p.method : '')).join(', '); }
+const SHARES = [[1, 'הכל'], [0.75, '¾'], [2 / 3, '⅔'], [0.5, '½'], [1 / 3, '⅓'], [0.25, '¼']];
+const shareName = x => (SHARES.find(s => Math.abs(s[0] - x) < 0.01) || [0, String(Math.round(x * 100)) + '%'])[1];
+function partsText(f) { return (f.parts || []).map(p => (qtyText(p) ? qtyText(p) + ' ' : '') + p.name + (p.method ? ' ' + p.method : '')).join(', ') + (f.share && f.share < 1 ? ` · אכלתי ${shareName(f.share)} מזה` : ''); }
 function foodEditor(f, i) {
   const lib = DATA.foodLib[f.name] || { cats: [] };
   const isNew = !lib.confirmed;
@@ -830,7 +832,13 @@ function foodEditor(f, i) {
   const pe = S.partEdit != null ? parts[S.partEdit] : null;
   const total = itemCats(f);
   return `<div style="margin-top:8px;padding:12px;border-radius:12px;background:#fff;border:1px solid #D9CCE4">
-    <div class="between"><div style="font-weight:700">${esc(f.name)}</div>${isNew ? '<span class="xs" style="font-weight:700;color:#8A6A12;background:#FBF5E6;border-radius:10px;padding:2px 8px">חדש בספרייה</span>' : ''}</div>
+    <div class="between"><div style="font-weight:700">${esc(f.name)}</div><div class="row" style="gap:6px">${isNew ? '<span class="xs" style="font-weight:700;color:#8A6A12;background:#FBF5E6;border-radius:10px;padding:2px 8px">חדש בספרייה</span>' : ''}<button class="chip" style="min-height:32px;font-size:13px" data-act="renOpen">${S.renOpen ? 'ביטול' : 'שינוי שם'}</button></div></div>
+    ${S.renOpen ? `<div style="margin-top:8px;padding:10px;border-radius:10px;background:var(--bg)">
+      <label class="small" style="font-weight:700" for="renIn">השם הנכון:</label>
+      <input id="renIn" class="input" list="foodList" style="margin-top:4px" autocomplete="off" enterkeyhint="done" value="${esc(S.renDraft != null ? S.renDraft : f.name)}" data-input="renDraft">
+      <div class="wrap" style="margin-top:8px"><button class="chip" data-act="renDo">לשנות את השם</button>
+        <button class="chip" data-act="renDo" data-a="keep">לשנות, ו"${esc(f.name)}"${qtyText(f) ? ' (' + esc(qtyText(f)) + ')' : ''} יהיה מרכיב בתוכה</button></div>
+      <div class="xs muted" style="margin-top:4px">השינוי חל רק על הרישום הזה. אם כבר יש היום פריט בשם החדש, הכל מתאחד לתוכו.</div></div>` : ''}
     ${dupBannerHtml(f.name, 'dupUse', 'dupNot')}
     ${itemNutLine(f)}
     <button class="chip" style="margin-top:6px;min-height:34px;font-size:13px" data-act="nutEd" data-a="${esc(f.name)}">${S.nutEd === f.name ? 'סגירת הערכים' : 'ערכים תזונתיים'}</button>
@@ -839,6 +847,8 @@ function foodEditor(f, i) {
     <div class="lbl">איך הוכן? <span class="muted" style="font-weight:400">(לא חובה)</span></div><div class="wrap">${METHODS.map(x => chip(x, f.method === x, 'fMethod', x)).join('')}</div><div class="xs muted" style="margin-top:4px">מוקפץ: מעט שמן במחבת (כפית עד כף) · מטוגן: שכבת שמן או טיגון עמוק</div>
     <div class="lbl">${parts.length ? 'כמה מהמנה כולה?' : 'כמה?'} <span class="muted" style="font-weight:400">(${parts.length ? 'למשל קערה אחת · את הכמות של כל מרכיב מגדירים למטה · ' : ''}לא חובה)</span></div>${qtyPicker(f.qty != null ? String(f.qty) : (f.amt ? String(f.amt) : ''), f.unit || '', 'fQty', 'fUnit', 'fQtyX')}
     <div class="lbl">מרכיבים <span class="muted" style="font-weight:400">(לא חובה · למנה שמורכבת מכמה דברים)</span></div>
+    ${parts.length ? `<div class="small" style="margin-bottom:6px">כמה מזה אכלת? <span class="xs muted">(אם המרכיבים הם של כל הסיר או המחבת)</span></div>
+      <div class="wrap" style="margin-bottom:8px">${SHARES.map(([x, l]) => chip(l, Math.abs((f.share || 1) - x) < 0.01, 'fShare', String(x))).join('')}</div>` : ''}
     ${parts.length ? `<div class="wrap">${parts.map((p, j) => `<span class="row" style="gap:2px;background:${S.partEdit === j ? '#EFE6F5' : 'var(--bg)'};border-radius:16px;padding:2px 4px 2px 10px;font-size:14px"><button type="button" style="background:none;border:none;padding:4px 0;font-size:14px;text-align:right" data-act="partEdit" data-a="${j}" aria-label="עריכת ${esc(p.name)}">${qtyText(p) ? `<b>${esc(qtyText(p))}</b> ` : ''}${esc(p.name)}${p.method ? ` <span class="xs muted">${esc(p.method)}</span>` : ''}</button><button class="iconbtn" style="width:30px;height:30px;color:var(--muted)" aria-label="הסרת ${esc(p.name)}" data-act="rmPart" data-a="${j}">${ICON.x}</button></span>`).join('')}</div>` : ''}
     ${pe ? `<div style="margin-top:8px;padding:10px;border-radius:10px;background:#F6F0FA;border:2px solid var(--accent)">
       ${dupBannerHtml(pe.name, 'dupUseP', 'dupNotP')}
@@ -861,6 +871,11 @@ function foodEditor(f, i) {
     <div class="lbl">מתי?</div><div class="wrap">${SLOTS.map(x => chip(x, f.slot === x, 'fSlot', x)).join('')}</div>
     <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><label class="small muted" for="fT">שעה</label><input id="fT" type="time" class="input" style="width:120px;min-height:40px" value="${esc(f.t || '')}" data-input="fT">
       ${S.day === todayS() ? '<button class="chip" style="min-height:36px" data-act="fNow">עכשיו</button>' : ''}</div>
+    ${(() => { const others = getDay(S.day).foods.map((o, j) => [o, j]).filter(([o, j]) => j !== i); if (!others.length) return '';
+      return S.moveOpen ? `<div style="margin-top:10px;padding:10px;border-radius:10px;background:var(--bg)"><div class="small" style="font-weight:700">להכניס את "${esc(f.name)}" כמרכיב בתוך:</div>
+        <div class="wrap" style="margin-top:6px">${others.map(([o, j]) => `<button class="chip" data-act="moveInto" data-a="${j}">${esc(o.name)}</button>`).join('')}<button class="chip" data-act="moveOpen">ביטול</button></div>
+        ${(f.parts || []).length ? '<div class="xs muted" style="margin-top:4px">גם המרכיבים שלו יעברו לשם.</div>' : ''}</div>`
+        : `<button class="chip" style="margin-top:10px;font-size:13px" data-act="moveOpen">להכניס כמרכיב של מנה אחרת</button>`; })()}
     <div class="row" style="margin-top:12px"><button class="btn" style="flex:1" data-act="foodEditDone">סיום</button><button class="btn ghost" style="color:#A3324A" data-act="rmFood" data-a="${i}">מחיקה</button></div>
   </div>`;
 }
@@ -1764,6 +1779,8 @@ function itemNut(f) {
   if (oilG && !hasListedOil && !parts.some(p => PART_OIL_FRAC[p.method])) {
     const ov = scaleNut(OIL_100, oilG); NUT_KEYS.forEach(([k]) => { v[k] += ov[k]; }); w += ov.kcal; uncSum += ov.kcal * 0.6;
   }
+  // the ingredients can describe the whole pot; `share` is the part of it she ate
+  const sh = f.share > 0 && f.share < 1 ? f.share : 1; if (sh !== 1) NUT_KEYS.forEach(([k]) => { v[k] *= sh; });
   return { v, unc: w ? uncSum / w : 0.3, partial: missing.length > 0, missing, noQty, estVals };
 }
 function dayNut(d) {
@@ -1798,6 +1815,25 @@ function kcalState(v) {
   return { st: 'over', txt: `מעל היעד בכ-${fmtV(v - hi, 'kcal')}`, c: '#9A4A5E' };
 }
 function energyPct(mid, k) { return mid.kcal ? Math.round(mid[k] * (k === 'f' ? 9 : 4) / mid.kcal * 100) : 0; }
+// average of the days that have food logged, over the 7 days ending at `end` — the number that actually moves weight
+function nutAvg(end, span) {
+  span = span || 7; const out = { n: 0, kcal: 0, p: 0, fib: 0, wk: [], we: [] };
+  for (let i = 0; i < span; i++) {
+    const k = addDays(end, -i), d = DATA.days[k]; if (!d || !(d.foods || []).length) continue;
+    const r = dayNut(d); if (!r.n) continue;
+    out.n++; out.kcal += r.mid.kcal; out.p += r.mid.p; out.fib += r.mid.fib;
+    const wd = parseD(k).getDay(); (wd === 5 || wd === 6 ? out.we : out.wk).push(r.mid.kcal); // Fri–Sat = weekend
+  }
+  if (out.n) { out.kcal /= out.n; out.p /= out.n; out.fib /= out.n; }
+  return out;
+}
+function avgLineHtml(end) {
+  const a = nutAvg(end); if (a.n < 2) return '';
+  const T = nutTargets(), ks = kcalState(a.kcal);
+  const m = arr => arr.length ? fmtV(arr.reduce((x, y) => x + y, 0) / arr.length, 'kcal') : null;
+  const split = a.wk.length && a.we.length ? ` · ימי חול כ-${m(a.wk)}, סופ״ש כ-${m(a.we)}` : '';
+  return `<div class="small" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(42,34,48,.08)"><b>ממוצע 7 ימים:</b> כ-${fmtV(a.kcal, 'kcal')} קק״ל${ks ? ` <span style="color:${ks.c};font-weight:700">(${ks.st === 'under' ? 'מתחת לרצפה' : ks.st === 'in' ? 'בטווח' : 'מעל היעד'})</span>` : ''} · חלבון ${fmtV(a.p, 'p')} ג׳<span class="xs muted"> · ${a.n} ימים עם רישום${split}</span></div>`;
+}
 function nutTargets() { return (DATA.settings && DATA.settings.nutTarget) || {}; }
 // the running total shown at the top of the day's food card
 function nutSummaryHtml(d) {
@@ -1819,6 +1855,7 @@ function nutSummaryHtml(d) {
     ${kcalLine ? `<div class="small" style="color:${ks.c};font-weight:700">${kcalLine}</div>` : ''}
     <div class="small" style="margin-top:4px">${['p', 'fib'].map(k => { const [, l, u] = NUT_KEYS.find(x => x[0] === k); return `${l} ${fmtV(s.mid[k], k)} ${u}${T[k] ? ` <span class="muted">(${left(k)})</span>` : ''}`; }).join(' · ')}</div>
     <div class="small">${['c', 'f'].map(k => { const [, l, u] = NUT_KEYS.find(x => x[0] === k); return `${l} ${fmtV(s.mid[k], k)} ${u} <span class="muted">(${energyPct(s.mid, k)}% מהקלוריות)</span>`; }).join(' · ')}</div>
+    ${avgLineHtml(S.day || todayS())}
     ${spread > 0.08 ? `<div class="xs muted" style="margin-top:4px">טווח אפשרי: ${fmtRange(s.lo.kcal, s.hi.kcal, 'kcal')} קק״ל${s.spreadBy.length ? ' · בעיקר בגלל: ' + s.spreadBy.map(x => esc(x[0]) + ' (' + x[2] + ')').join(', ') : ''}</div>` : ''}
     <div class="xs muted" style="margin-top:4px">${s.n} מתוך ${s.total} פריטים עם ערכים${s.missing.length ? ' · חסרים: ' + esc(s.missing.join(', ')) : ''}</div>
   </div>`;
@@ -2068,6 +2105,9 @@ const NUT_BASE = {
   'אדממה': [121, 12, 8.9, 5.2, 5.2, { 'כוס': 155, 'חופן': 40, 'מנה': 100 }],
   'טופו': [144, 17, 2.8, 8.7, 2.3, { 'חפיסה': 300, 'כף': 20, 'מנה': 100 }],
   'אורז': [130, 2.7, 28, 0.3, 0.4, { 'כף': 10, 'כוס': 160, 'מנה': 150 }],
+  'אורז יסמין': [130, 2.7, 28, 0.3, 0.4, { 'כף': 10, 'כוס': 160, 'מנה': 150 }],
+  'אורז בסמטי': [130, 2.7, 28, 0.3, 0.4, { 'כף': 10, 'כוס': 160, 'מנה': 150 }],
+  'אורז לבן': [130, 2.7, 28, 0.3, 0.4, { 'כף': 10, 'כוס': 160, 'מנה': 150 }],
   'אורז מלא': [123, 2.7, 26, 1.0, 1.6, { 'כף': 12, 'כוס': 195, 'מנה': 150 }],
   'קינואה': [120, 4.4, 21, 1.9, 2.8, { 'כף': 12, 'כוס': 185, 'מנה': 150 }],
   'בורגול': [83, 3.1, 19, 0.2, 4.5, { 'כף': 11, 'כוס': 180, 'מנה': 150 }],
@@ -2225,6 +2265,10 @@ const NUT_BASE = {
   'סחוג': [150, 2, 6, 13, 3, { 'כפית': 5, 'כף': 15, 'מנה': 10 }],
   'עמבה': [80, 1, 15, 2, 2, { 'כף': 15, 'מנה': 15 }],
   'פתית 6 דגנים': [378, 8.5, 72.7, 4.2, 7.6, { 'יחידה': 5.5, 'מנה': 33 }],
+  'קקאו הולנדי': [220, 18, 58, 13, 30, { 'כף': 5.4, 'כפית': 1.8, 'מנה': 10 }],
+  'אבקת קקאו': [220, 18, 58, 13, 30, { 'כף': 5.4, 'כפית': 1.8, 'מנה': 10 }],
+  'קקאו': [220, 18, 58, 13, 30, { 'כף': 5.4, 'כפית': 1.8, 'מנה': 10 }],
+  'יוגורט עיזים': [65, 3.3, 4, 3.3, 0, { 'כף': 20, 'יחידה': 200, 'מנה': 150 }],
   // sweets, snacks
   'עוגיות': [480, 5.5, 65, 22, 2, { 'יחידה': 12, 'מנה': 30 }],
   'עוגייה': [480, 5.5, 65, 22, 2, { 'יחידה': 12, 'מנה': 12 }],
@@ -2238,7 +2282,7 @@ const NUT_BASE = {
   'גלידה': [207, 3.5, 24, 11, 0.7, { 'כדור': 60, 'כוס': 130, 'מנה': 100 }],
 };
 // entries taken from USDA SR Legacy (the rest are general estimates)
-const NUT_BASE_USDA = new Set(["אבוקדו", "אבטיח", "אגוזי ברזיל", "אגוזי לוז", "אגוזי מלך", "אגס", "אדממה", "אוכמניות", "אורז", "אורז מלא", "אטריות אורז", "אטריות ביצים", "אננס", "אספרגוס", "אפונה", "אפרסמון", "אפרסק", "ארטישוק", "אשכולית", "בוטנים", "בורגול", "בזיליקום", "בטטה", "בטטה אפויה", "בייבי תרד", "בייגל", "ביצה", "ביצה קשה", "בירה", "בננה", "בצל", "בצל ירוק", "בצל סגול", "ברוקולי", "גבינה שוויצרית", "גבינת עיזים", "גבינת שמנת", "גזר", "גלידה", "גמבה", "גרגירי חומוס", "גרעיני דלעת", "גרעיני חמנייה", "ג׳ינג׳ר", "דבש", "דובדבנים", "דלעת", "זיתים", "זרעי פשתן", "זרעי צ׳יה", "חומוס", "חומץ", "חומץ בלסמי", "חלב", "חלב 1%", "חלב 3%", "חלב סויה", "חלב קוקוס", "חלב שקדים", "חמאה", "חמאת בוטנים", "חמאת שקדים", "חסה", "חסה רומית", "חציל", "חרדל", "טונה", "טופו", "טורטייה", "טחינה", "טמפה", "טריאקי", "יוגורט", "יוגורט יווני", "יין אדום", "יין לבן", "כוסברה", "כוסמת", "כרוב", "כרוב ניצנים", "כרוב סגול", "כרובית", "כרישה", "לחם", "לחם מלא", "לחם שיפון", "לחמניה", "לימון", "ליצ׳י", "מאפין", "מוצרלה", "מיונז", "מיץ לימון", "מיץ תפוזים", "מלון", "מלפפון", "מלפפון חמוץ", "ממרח שוקולד", "מנגו", "מצה", "מקדמיה", "משמש מיובש", "נבטים", "נוטלה", "נענע", "סוכר", "סלמון", "סלסה", "סלק", "סלרי", "עגבניה", "עגבניות מרוסקות", "עגבניות שרי", "עדשים", "עדשים ירוקות", "עדשים כתומות", "עדשים שחורות", "עלי גפן", "ענבים", "פול", "פולנטה", "פומלה", "פופקורן", "פטה", "פטל", "פטרוזיליה", "פטריות", "פטריות מוקפצות", "פיסטוקים", "פירורי לחם", "פיתה", "פלאפל", "פלפל", "פלפל אדום", "פלפל ירוק", "פלפלים צבעוניים", "פסאטה", "פסטה", "פסטה מלאה", "פסטו", "פפאיה", "פקאן", "פריכיות", "פריכית אורז", "פרמזן", "פשתן", "צימוקים", "צנוברים", "צנונית", "צ׳ילי", "קולה", "קולורבי", "קוסקוס", "קוקוס מגורר", "קטשופ", "קיווי", "קינואה", "קישוא", "קלמנטינה", "קמח", "קמח חומוס", "קפה", "קפיר", "קרואסון", "קשיו", "רוטב טריאקי", "רוטב סויה", "רוקט", "ריבה", "רימון", "ריקוטה", "רסק עגבניות", "שום", "שומר", "שומשום", "שוקולד חלב", "שוקולד מריר 70%", "שזיף", "שזיפים מיובשים", "שיבולת שועל", "שמיר", "שמן", "שמן זית", "שמן קוקוס", "שמן קנולה", "שמן שומשום", "שמנת חמוצה", "שמנת מתוקה", "שמפיניון", "שן שום", "שעועית אדומה", "שעועית ירוקה", "שעועית ירוקה מבושלת", "שעועית לבנה", "שעועית שחורה", "שקדים", "תאנה", "תאנים מיובשות", "תותים", "תירס", "תירס משומר", "תמר מג׳הול", "תמרים", "תפוז", "תפוח", "תפוח אדמה", "תפוח אדמה אפוי", "תפוח עץ", "תרד", "תרד מבושל"]);
+const NUT_BASE_USDA = new Set(["אבוקדו", "אבטיח", "אבקת קקאו", "אגוזי ברזיל", "אגוזי לוז", "אגוזי מלך", "אגס", "אדממה", "אוכמניות", "אורז", "אורז בסמטי", "אורז יסמין", "אורז לבן", "אורז מלא", "אטריות אורז", "אטריות ביצים", "אננס", "אספרגוס", "אפונה", "אפרסמון", "אפרסק", "ארטישוק", "אשכולית", "בוטנים", "בורגול", "בזיליקום", "בטטה", "בטטה אפויה", "בייבי תרד", "בייגל", "ביצה", "ביצה קשה", "בירה", "בננה", "בצל", "בצל ירוק", "בצל סגול", "ברוקולי", "גבינה שוויצרית", "גבינת עיזים", "גבינת שמנת", "גזר", "גלידה", "גמבה", "גרגירי חומוס", "גרעיני דלעת", "גרעיני חמנייה", "ג׳ינג׳ר", "דבש", "דובדבנים", "דלעת", "זיתים", "זרעי פשתן", "זרעי צ׳יה", "חומוס", "חומץ", "חומץ בלסמי", "חלב", "חלב 1%", "חלב 3%", "חלב סויה", "חלב קוקוס", "חלב שקדים", "חמאה", "חמאת בוטנים", "חמאת שקדים", "חסה", "חסה רומית", "חציל", "חרדל", "טונה", "טופו", "טורטייה", "טחינה", "טמפה", "טריאקי", "יוגורט", "יוגורט יווני", "יין אדום", "יין לבן", "כוסברה", "כוסמת", "כרוב", "כרוב ניצנים", "כרוב סגול", "כרובית", "כרישה", "לחם", "לחם מלא", "לחם שיפון", "לחמניה", "לימון", "ליצ׳י", "מאפין", "מוצרלה", "מיונז", "מיץ לימון", "מיץ תפוזים", "מלון", "מלפפון", "מלפפון חמוץ", "ממרח שוקולד", "מנגו", "מצה", "מקדמיה", "משמש מיובש", "נבטים", "נוטלה", "נענע", "סוכר", "סלמון", "סלסה", "סלק", "סלרי", "עגבניה", "עגבניות מרוסקות", "עגבניות שרי", "עדשים", "עדשים ירוקות", "עדשים כתומות", "עדשים שחורות", "עלי גפן", "ענבים", "פול", "פולנטה", "פומלה", "פופקורן", "פטה", "פטל", "פטרוזיליה", "פטריות", "פטריות מוקפצות", "פיסטוקים", "פירורי לחם", "פיתה", "פלאפל", "פלפל", "פלפל אדום", "פלפל ירוק", "פלפלים צבעוניים", "פסאטה", "פסטה", "פסטה מלאה", "פסטו", "פפאיה", "פקאן", "פריכיות", "פריכית אורז", "פרמזן", "פשתן", "צימוקים", "צנוברים", "צנונית", "צ׳ילי", "קולה", "קולורבי", "קוסקוס", "קוקוס מגורר", "קטשופ", "קיווי", "קינואה", "קישוא", "קלמנטינה", "קמח", "קמח חומוס", "קפה", "קפיר", "קקאו", "קקאו הולנדי", "קרואסון", "קשיו", "רוטב טריאקי", "רוטב סויה", "רוקט", "ריבה", "רימון", "ריקוטה", "רסק עגבניות", "שום", "שומר", "שומשום", "שוקולד חלב", "שוקולד מריר 70%", "שזיף", "שזיפים מיובשים", "שיבולת שועל", "שמיר", "שמן", "שמן זית", "שמן קוקוס", "שמן קנולה", "שמן שומשום", "שמנת חמוצה", "שמנת מתוקה", "שמפיניון", "שן שום", "שעועית אדומה", "שעועית ירוקה", "שעועית ירוקה מבושלת", "שעועית לבנה", "שעועית שחורה", "שקדים", "תאנה", "תאנים מיובשות", "תותים", "תירס", "תירס משומר", "תמר מג׳הול", "תמרים", "תפוז", "תפוח", "תפוח אדמה", "תפוח אדמה אפוי", "תפוח עץ", "תרד", "תרד מבושל"]);
 const _nutBaseByKey = {};
 function nutBaseFor(name) {
   if (NUT_BASE[name]) return NUT_BASE[name];
@@ -2550,11 +2594,34 @@ const ACT = {
   dupMerge: a => { const [i, n] = split2(a); const g = dupGroups()[Number(i)]; if (!g) return; if (!confirm(`לאחד את ${g.length} השמות לשם "${n}"? כל הרישומים יעברו אליו.`)) return; mergeFoods(g, n); save(); render(); toast('אוחד'); },
   dupNo: a => { const g = dupGroups()[Number(a)]; if (!g) return; g.forEach(x => g.forEach(y => { if (x !== y) notDup(x, y); })); save(); render(); },
   wkMove: a => { const i = a.lastIndexOf('::'); const key = a.slice(0, i), to = a.slice(i + 2); DATA.workoutMove = DATA.workoutMove || {}; if (key.split('|')[0] === to) delete DATA.workoutMove[key]; else DATA.workoutMove[key] = to; invalidate(); save(); render(); toast('האימון הועבר'); },
+  fShare: a => { const f = curFood(); if (!f) return; const x = Number(a); if (x >= 1) delete f.share; else f.share = x; save(); render(); },
+  renOpen: () => { S.renOpen = !S.renOpen; S.renDraft = null; render(); },
+  renDo: a => { const d = editDay(S.day); const i = S.foodEdit; const f = d.foods[i]; if (!f) return;
+    const el = document.getElementById('renIn'); const nn = ((el && el.value) || '').trim().replace(/\s+/g, ' ');
+    if (!nn || nn === f.name) { S.renOpen = false; render(); return; }
+    const old = f.name, oldLib = DATA.foodLib[old];
+    // the ingredients were remembered under the wrong name, so they won't come back next time it's typed
+    if (oldLib && (f.parts || []).length) { delete oldLib.parts; delete oldLib.lastMethod; }
+    let parts = (f.parts || []).slice();
+    if (a === 'keep') { const p = { name: old }; ['qty', 'qn', 'unit', 'method'].forEach(k => { if (f[k] != null) { p[k] = f[k]; delete f[k]; } }); parts = [p].concat(parts); }
+    if (!DATA.foodLib[nn]) { DATA.foodLib[nn] = { cats: guessFoodCats(nn).cats, confirmed: false }; applyNutBase(nn); }
+    const j = d.foods.findIndex((o, k) => k !== i && o.name === nn);
+    if (j >= 0) { const t = d.foods[j]; t.parts = (t.parts || []).concat(parts); if (f.note && !t.note) t.note = f.note; d.foods.splice(i, 1); S.foodEdit = j > i ? j - 1 : j; }
+    else { f.name = nn; if (parts.length) f.parts = parts; else delete f.parts; }
+    const nl = DATA.foodLib[nn]; if (nl && !nl.confirmed && parts.length) nl.cats = [];
+    S.renOpen = false; S.renDraft = null; S.partEdit = null; rememberMeal(d.foods[S.foodEdit]); invalidate(); save(); render(); toast('השם עודכן'); },
+  moveOpen: () => { S.moveOpen = !S.moveOpen; render(); },
+  // an item added on its own by mistake becomes an ingredient of another dish (with its amount and its own ingredients)
+  moveInto: a => { const d = editDay(S.day); const i = S.foodEdit, j = Number(a); const f = d.foods[i], t = d.foods[j]; if (!f || !t) return;
+    const p = { name: f.name }; ['qty', 'qn', 'unit', 'method'].forEach(k => { if (f[k] != null) p[k] = f[k]; });
+    t.parts = (t.parts || []).concat([p], f.parts || []);
+    const lt = DATA.foodLib[t.name]; if (lt && !lt.confirmed) lt.cats = [];
+    d.foods.splice(i, 1); S.moveOpen = false; S.partEdit = null; S.foodEdit = j > i ? j - 1 : j; rememberMeal(d.foods[S.foodEdit]); save(); render(); toast('הועבר כמרכיב'); },
   fCatsOpen: () => { S.fCatsOpen = true; render(); },
   fSlot: a => { const f = curFood(); if (!f) return; f.slot = a; save(); render(); },
   fNow: () => { const f = curFood(); if (!f) return; f.t = nowHM(); save(); render(); },
   fCat: a => { const f = curFood(); if (!f) return; const lib = DATA.foodLib[f.name] = DATA.foodLib[f.name] || { cats: [] }; toggleIn(lib.cats, a); lib.confirmed = true; save(); render(); },
-  foodEdit: a => { const n = Number(a); if (S.foodEdit != null && S.foodEdit !== n) ACT.foodEditDone(true); S.foodEdit = S.foodEdit === n ? null : n; S.partEdit = null; S.fCatsOpen = false; S.partDraft = ''; render(); },
+  foodEdit: a => { const n = Number(a); if (S.foodEdit != null && S.foodEdit !== n) ACT.foodEditDone(true); S.foodEdit = S.foodEdit === n ? null : n; S.partEdit = null; S.fCatsOpen = false; S.moveOpen = false; S.renOpen = false; S.renDraft = null; S.partDraft = ''; render(); },
   foodEditDone: quiet => { const pi = document.getElementById('partIn'); if (pi && pi.value.trim()) ACT.addPart(true); const f = curFood(); if (f) { const lib = DATA.foodLib[f.name]; if (lib) lib.confirmed = true; rememberMeal(f); save(); } if (quiet === true) return; S.foodEdit = null; S.partEdit = null; S.partDraft = ''; render(); },
   addPart: function () { const f = curFood(); const el = document.getElementById('partIn'); const name = ((el && el.value) || '').trim().replace(/\s+/g, ' '); if (!f || !name) return;
     // a new dish broken into ingredients: its groups come from them, not from guessing its name (rice noodles are not wheat)
@@ -2615,7 +2682,7 @@ const ACT = {
   export: () => IMG.all().then(images => {
     let wl = []; try { wl = JSON.parse(localStorage.getItem(WORKOUT_KEY) || '[]'); } catch (e) {}
     const out = { app: 'tracker', version: 1, exportedAt: new Date().toISOString(), data: DATA, workoutLog: wl, images,
-      legend: { suppTaken: 'supplement value = HH:MM when taken, or true if no time', scales: 'mood score 1-5 (overall mood, optional), energy 1-5 (separate energy entries; older mood entries may also carry energy), pain 0-10, severity קלה<בינונית<חזקה<קשה, bristol 1-7', dayBoundary: 'a day runs until ' + pad(dayStartH()) + ':00 the next morning; entry/supplement/food times earlier than that (00:00-' + pad(dayStartH()) + ':00) happened in the night AFTER that day, not its early morning', foodCats: Object.fromEntries(FOOD_CATS), foodItems: 'a food item may be a meal: parts = its ingredients (each with its own qty/unit and its own groups in foodLib), qty/unit on the item = the whole portion (e.g. 1 bowl); method = how it was cooked (מוקפץ adds oil, מטוגן adds fried+oil), on the dish or on each part; prep = home / bought / eaten out. The groups of an item = foodLib[name].cats + its parts\' cats + method', nutrition: 'foodLib[name].nut = estimated values per 100 g (kcal, p=protein, c=carbs, f=fat, fib=fiber); nutSrc user = typed by her (trust), est = estimate; g = grams per unit (מנה = typical portion). Day totals are estimates with ranges; settings.nutTarget = her daily targets' } };
+      legend: { suppTaken: 'supplement value = HH:MM when taken, or true if no time', scales: 'mood score 1-5 (overall mood, optional), energy 1-5 (separate energy entries; older mood entries may also carry energy), pain 0-10, severity קלה<בינונית<חזקה<קשה, bristol 1-7', dayBoundary: 'a day runs until ' + pad(dayStartH()) + ':00 the next morning; entry/supplement/food times earlier than that (00:00-' + pad(dayStartH()) + ':00) happened in the night AFTER that day, not its early morning', foodCats: Object.fromEntries(FOOD_CATS), foodItems: 'a food item may be a meal: share = the fraction of the listed ingredients she ate (e.g. 0.5 = half the pot); parts = its ingredients (each with its own qty/unit and its own groups in foodLib), qty/unit on the item = the whole portion (e.g. 1 bowl); method = how it was cooked (מוקפץ adds oil, מטוגן adds fried+oil), on the dish or on each part; prep = home / bought / eaten out. The groups of an item = foodLib[name].cats + its parts\' cats + method', nutrition: 'foodLib[name].nut = estimated values per 100 g (kcal, p=protein, c=carbs, f=fat, fib=fiber); nutSrc user = typed by her (trust), est = estimate; g = grams per unit (מנה = typical portion). Day totals are estimates with ranges; settings.nutTarget = her daily targets' } };
     download('tracker-' + todayS() + '.json', JSON.stringify(out, null, 1));
     try { localStorage.setItem('tracker.lastBackup', todayS()); } catch (e) {}
     if (S.tab === 'settings' && !S.day) setTimeout(render, 300);
@@ -2662,6 +2729,7 @@ document.addEventListener('input', e => {
   else if (k === 'fQtyX') { const f = curFood(); if (f) { setQty(f, el.value.trim()); save(); } }
   else if (k === 'pQtyX') { const f = curFood(); const p = f && f.parts && f.parts[S.partEdit]; if (p) { setQty(p, el.value.trim()); save(); } }
   else if (k === 'partDraft') S.partDraft = el.value;
+  else if (k === 'renDraft') S.renDraft = el.value;
   else if (k === 'fNote') { const f = curFood(); if (f) { const v = el.value; if (v.trim()) f.note = v; else delete f.note; save(); } }
   else if (k === 'fT') { const f = editDay(S.day).foods[S.foodEdit]; if (f) { if (el.value) f.t = el.value; else delete f.t; save(); } }
   else if (k === 'craveAt') { const d = editDay(S.day); d.craveT = d.craveT || {}; d.craveT[el.dataset.a] = el.value || true; save(); }
