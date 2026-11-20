@@ -109,7 +109,7 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
-const APP_VERSION = '19.11ד';
+const APP_VERSION = '20.11ב';
 const AMOUNTS = ['½', '1', '1½', '2', '3'];
 // units: [singular, plural]
 const UNITS = [['יחידה', 'יחידות'], ['גרם', 'גרם'], ['קובייה', 'קוביות'], ['פרוסה', 'פרוסות'], ['כף', 'כפות'], ['כפית', 'כפיות'], ['כוס', 'כוסות'],
@@ -190,7 +190,7 @@ const SEVERITY = ['קלה', 'בינונית', 'חזקה', 'קשה'];
 const GEN_GROUPS = [
   ['ראש וקוגניציה', ['כאב ראש', 'מיגרנה', 'ערפל מוחי', 'קושי להתרכז', 'סחרחורת']],
   ['אנרגיה ושינה', ['חולשה כללית', 'עייפות קיצונית', 'נדודי שינה']],
-  ['חום וגוף', ['חום', 'צמרמורות', 'גלי חום', 'דופק מהיר', 'כאבי שרירים כלליים']],
+  ['חום וגוף', ['חום', 'צמרמורות', 'גלי חום', 'הזעה', 'הזעות לילה', 'דופק מהיר', 'כאבי שרירים כלליים']],
   ['צינון ונשימה', ['צינון', 'נזלת', 'גודש באף', 'כאב גרון', 'שיעול', 'ליחה', 'צרידות', 'כאב אוזניים']],
   ['הורמונלי', ['רגישות בשדיים', 'אקנה', 'רגישות לריחות']],
   ['עור ואלרגיה', ['גירוד', 'פריחה', 'סרפדת (חבורות מגרדות)', 'תגובה חזקה לעקיצה', 'עקיצה שלא עוברת', 'עיניים מגרדות / דומעות', 'התעטשויות', 'עקצוצים בשפה', 'פצע קור (הרפס)']],
@@ -308,6 +308,12 @@ const AREA_HE = { glutes: 'ישבן', quads: 'ירך קדמית', back: 'גב', 
 let _workouts = null;
 // which day a workout belongs to: when it STARTED, with the night until dayStart counted as the evening before
 function workoutDay(w) {
+  // a timed workout saved when it ended: start = save time minus its length. Its date field can't be trusted —
+  // older versions of the workout app wrote the UTC date (a workout at 00:30 got the day before)
+  if (w.logged && w.end && w.totalSeconds) {
+    const L = new Date(w.logged);
+    if (!isNaN(L)) { const st = new Date(L.getTime() - w.totalSeconds * 1000); st.setHours(st.getHours() - dayStartH()); return ymd(st); }
+  }
   if (w.logged && w.time) {
     const L = new Date(w.logged);
     if (!isNaN(L)) {
@@ -2923,7 +2929,19 @@ window.addEventListener('pagehide', flushNote);
 // before its change event arrives, and the chosen file would be lost
 let pickingFile = 0;
 document.addEventListener('click', e => { const t = e.target; if (t && t.closest && (t.matches('input[type=file]') || (t.closest('label') && t.closest('label').querySelector('input[type=file]')))) pickingFile = Date.now(); }, true);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { invalidate(); if (pickingFile && Date.now() - pickingFile < 10 * 60 * 1000) { pickingFile = 0; return; } if (!$sheet.classList.contains('open') && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) render(); } });
+// back from the workout app: read its log again and redraw — right away, or once she leaves the field she is typing in
+let staleView = false;
+function refreshFromOutside() {
+  invalidate();
+  if ($sheet.classList.contains('open') || (document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) { staleView = true; return; }
+  staleView = false; render();
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (pickingFile && Date.now() - pickingFile < 10 * 60 * 1000) { invalidate(); return; } refreshFromOutside(); } });
+window.addEventListener('pageshow', e => { if (e.persisted) refreshFromOutside(); });
+window.addEventListener('focus', () => { if (pickingFile && Date.now() - pickingFile < 10 * 60 * 1000) return; refreshFromOutside(); });
+// the workout app open at the same time (another tab or window) saved a workout
+window.addEventListener('storage', e => { if (e.key === WORKOUT_KEY || e.key == null) refreshFromOutside(); });
+document.addEventListener('focusout', () => { if (staleView) setTimeout(() => { if (staleView && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) && !$sheet.classList.contains('open')) { staleView = false; render(); } }, 300); });
 
 /* ---------------- init ---------------- */
 load();
