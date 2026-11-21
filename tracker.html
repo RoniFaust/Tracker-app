@@ -109,7 +109,7 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
-const APP_VERSION = '20.11ב';
+const APP_VERSION = '21.11';
 const AMOUNTS = ['½', '1', '1½', '2', '3'];
 // units: [singular, plural]
 const UNITS = [['יחידה', 'יחידות'], ['גרם', 'גרם'], ['קובייה', 'קוביות'], ['פרוסה', 'פרוסות'], ['כף', 'כפות'], ['כפית', 'כפיות'], ['כוס', 'כוסות'],
@@ -129,6 +129,12 @@ function qtyText(f) {
   if (!q || q === '1') return u[0] === 'יחידה' ? '1' : u[0];
   if (q === '½') return 'חצי ' + u[0];
   return q + ' ' + u[1];
+}
+// "one slice", "2 slices" — for the dish amount the ingredient amounts belong to
+function baseText(n, unit) {
+  const u = UNITS.find(x => x[0] === unit);
+  if (n === 1) return u ? (u[0] === 'יחידה' ? 'יחידה אחת' : u[0] + ' אחת') : 'מנה אחת';
+  return n + ' ' + (u ? u[1] : 'מנות');
 }
 // how it was cooked (optional, per item or for a whole meal)
 const METHODS = ['מוקפץ', 'מטוגן', 'אפוי', 'מבושל', 'צלוי / גריל', 'מאודה', 'טרי / לא מבושל'];
@@ -830,7 +836,7 @@ function qtyPicker(q, unit, actQ, actU, inp) {
 }
 const SHARES = [[1, 'הכל'], [0.75, '¾'], [2 / 3, '⅔'], [0.5, '½'], [1 / 3, '⅓'], [0.25, '¼']];
 const shareName = x => (SHARES.find(s => Math.abs(s[0] - x) < 0.01) || [0, String(Math.round(x * 100)) + '%'])[1];
-function partsText(f) { return (f.parts || []).map(p => (qtyText(p) ? qtyText(p) + ' ' : '') + p.name + (p.method ? ' ' + p.method : '')).join(', ') + (f.share && f.share < 1 ? ` · אכלתי ${shareName(f.share)} מזה` : ''); }
+function partsText(f) { return (f.parts || []).map(p => (qtyText(p) ? qtyText(p) + ' ' : '') + p.name + (p.method ? ' ' + p.method : '')).join(', ') + (f.share && f.share < 1 ? ` · אכלתי ${shareName(f.share)} מזה` : '') + (partsScale(f) !== 1 ? ` · הכמויות הן עבור ${baseText(f.partsFor, f.partsUnit)}, והחישוב לפי ${baseText(f.qn, f.unit)}` : ''); }
 function foodEditor(f, i) {
   const lib = DATA.foodLib[f.name] || { cats: [] };
   const isNew = !lib.confirmed;
@@ -854,7 +860,10 @@ function foodEditor(f, i) {
     <div class="lbl">${parts.length ? 'כמה מהמנה כולה?' : 'כמה?'} <span class="muted" style="font-weight:400">(${parts.length ? 'אם שקלת מה שאכלת, הכי מדויק לרשום גרמים · ' : ''}לא חובה)</span></div>${qtyPicker(f.qty != null ? String(f.qty) : (f.amt ? String(f.amt) : ''), f.unit || '', 'fQty', 'fUnit', 'fQtyX')}
     <div class="lbl">מרכיבים <span class="muted" style="font-weight:400">(לא חובה · למנה שמורכבת מכמה דברים)</span></div>
     ${parts.length && f.unit === 'גרם' && f.qty != null ? `<div class="xs muted" style="margin-bottom:6px">רשמת כמה גרם אכלת, אז המרכיבים קובעים רק את ההרכב של המנה, והכמות נלקחת מהמשקל.</div>` : ''}
-    ${parts.length && !(f.unit === 'גרם' && f.qty != null) ? `<div class="small" style="margin-bottom:6px">כמה מזה אכלת? <span class="xs muted">(אם המרכיבים הם של כל הסיר או המחבת)</span></div>
+    ${parts.some(p => p.qty != null) && f.qn != null && f.unit !== 'גרם' && (f.qn !== 1 || partsBaseOk(f)) ? `<div class="small" style="margin-bottom:6px">כמויות המרכיבים הן בשביל:</div>
+      <div class="wrap" style="margin-bottom:4px">${chip(baseText(1, f.unit), partsBaseOk(f) && f.partsFor === 1, 'partsFor', '1')}${partsBaseOk(f) && f.partsFor !== 1 && f.partsFor !== f.qn ? chip(baseText(f.partsFor, f.unit), true, 'partsFor', String(f.partsFor)) : ''}${f.qn !== 1 ? chip('כל מה שרשמתי: ' + baseText(f.qn, f.unit), !partsBaseOk(f) || f.partsFor === f.qn, 'partsFor', 'all') : ''}</div>
+      <div class="xs muted" style="margin-bottom:8px">${partsScale(f) !== 1 ? `החישוב מכפיל את המרכיבים פי ${+(partsScale(f)).toFixed(2)}. בפעם הבאה שתבחרי כמות אחרת, הוא יתאים את עצמו.` : 'כשהכמויות הן ליחידה אחת, אפשר אחר כך לשנות את הכמות והמרכיבים יוכפלו לבד.'}</div>` : ''}
+    ${parts.length && !(f.unit === 'גרם' && f.qty != null) && !partsBaseOk(f) ? `<div class="small" style="margin-bottom:6px">כמה מזה אכלת? <span class="xs muted">(אם המרכיבים הם של כל הסיר או המחבת)</span></div>
       <div class="wrap" style="margin-bottom:8px">${SHARES.map(([x, l]) => chip(l, Math.abs((f.share || 1) - x) < 0.01, 'fShare', String(x))).join('')}</div>` : ''}
     ${parts.length ? `<div class="wrap">${parts.map((p, j) => `<span class="row" style="gap:2px;background:${S.partEdit === j ? '#EFE6F5' : 'var(--bg)'};border-radius:16px;padding:2px 4px 2px 10px;font-size:14px"><button type="button" style="background:none;border:none;padding:4px 0;font-size:14px;text-align:right" data-act="partEdit" data-a="${j}" aria-label="עריכת ${esc(p.name)}">${qtyText(p) ? `<b>${esc(qtyText(p))}</b> ` : ''}${esc(p.name)}${p.method ? ` <span class="xs muted">${esc(p.method)}</span>` : ''}</button><button class="iconbtn" style="width:30px;height:30px;color:var(--muted)" aria-label="הסרת ${esc(p.name)}" data-act="rmPart" data-a="${j}">${ICON.x}</button></span>`).join('')}</div>` : ''}
     ${pe ? `<div style="margin-top:8px;padding:10px;border-radius:10px;background:#F6F0FA;border:2px solid var(--accent)">
@@ -1758,6 +1767,9 @@ function valUnc(name) { const l = DATA.foodLib[name] || {}; if (l.nutSrc === 'us
 const combUnc = (a, b) => Math.sqrt(a * a + b * b);
 function scaleNut(nut, grams) { const o = {}; NUT_KEYS.forEach(([k]) => { o[k] = (Number(nut[k]) || 0) * grams / 100; }); return o; }
 // estimate for one eaten item: {v, unc, partial, missing:[names]} or null
+// the ingredient amounts can be for one unit of the dish (one slice of the stew): 2 slices = twice the ingredients
+function partsBaseOk(f) { return f.partsFor > 0 && (f.unit || '') === (f.partsUnit || ''); }
+function partsScale(f) { return partsBaseOk(f) && f.qn != null ? f.qn / f.partsFor : 1; }
 function itemNut(f) {
   const lib = DATA.foodLib[f.name] || {};
   const parts = f.parts || [];
@@ -1795,7 +1807,7 @@ function itemNut(f) {
     return { v, unc: combUnc(combUnc(w ? uncV / w : 0.1, dg.unc), ratioEst ? 0.25 : 0), partial: missing.length > 0, missing, noQty: false, estVals, ratioEst, byDish: true };
   }
   // the ingredients can describe the whole pot; `share` is the part of it she ate
-  const sh = f.share > 0 && f.share < 1 ? f.share : 1; if (sh !== 1) NUT_KEYS.forEach(([k]) => { v[k] *= sh; });
+  const sh = (f.share > 0 && f.share < 1 ? f.share : 1) * partsScale(f); if (sh !== 1) NUT_KEYS.forEach(([k]) => { v[k] *= sh; });
   return { v, unc: w ? uncSum / w : 0.3, partial: missing.length > 0, missing, noQty, estVals };
 }
 function dayNut(d) {
@@ -2663,7 +2675,7 @@ function addFoodName(name) {
   const item = { name, slot: S.slot, prep: lastPrepOf(name) || '' };
   if (S.foodTime) item.t = S.foodTime;
   if (lib.lastUnit && lib.lastUnit !== 'גרם') item.unit = lib.lastUnit;
-  if (lib.parts && lib.parts.length) { item.parts = lib.parts.map(p => Object.assign({}, p)); if (lib.lastMethod) item.method = lib.lastMethod; }
+  if (lib.parts && lib.parts.length) { item.parts = lib.parts.map(p => Object.assign({}, p)); if (lib.lastMethod) item.method = lib.lastMethod; if (lib.partsFor > 0) { item.partsFor = lib.partsFor; item.partsUnit = lib.partsUnit || ''; if (lib.partsUnit) item.unit = lib.partsUnit; else delete item.unit; } }
   d.foods.push(item);
   S.foodEdit = d.foods.length - 1; S.partEdit = null; S.fCatsOpen = false; S.partDraft = '';
   save();
@@ -2672,8 +2684,16 @@ function curFood() { return S.foodEdit != null ? editDay(S.day).foods[S.foodEdit
 // a meal remembers its ingredients (without amounts that change) so next time they come back filled
 function rememberMeal(f) {
   const lib = DATA.foodLib[f.name]; if (!lib) return;
-  if ((f.parts || []).length) { lib.parts = f.parts.map(p => { const o = { name: p.name }; if (p.unit) o.unit = p.unit; if (p.method) o.method = p.method; if (p.qty != null) { o.qty = p.qty; if (p.qn != null) o.qn = p.qn; } return o; }); if (f.method) lib.lastMethod = f.method; else delete lib.lastMethod; }
-  else { delete lib.parts; delete lib.lastMethod; }
+  if ((f.parts || []).length) { lib.parts = f.parts.map(p => { const o = { name: p.name }; if (p.unit) o.unit = p.unit; if (p.method) o.method = p.method; if (p.qty != null) { o.qty = p.qty; if (p.qn != null) o.qn = p.qn; } return o; }); if (f.method) lib.lastMethod = f.method; else delete lib.lastMethod;
+    const base = f.partsFor > 0 ? f.partsFor : (f.qn === 1 && f.unit !== 'גרם' && f.parts.some(p => p.qty != null) ? 1 : 0);
+    if (base) { lib.partsFor = base; lib.partsUnit = f.partsFor > 0 ? (f.partsUnit || '') : (f.unit || ''); } else { delete lib.partsFor; delete lib.partsUnit; } }
+  else { delete lib.parts; delete lib.lastMethod; delete lib.partsFor; delete lib.partsUnit; }
+}
+// ingredient amounts set while the dish was "1 slice" stay the amounts for one slice when she changes it to 2
+function markPartsBase(f) {
+  if (f.partsFor > 0 || f.qn == null || f.unit === 'גרם') return;
+  if (!(f.parts || []).some(p => p.qty != null)) return;
+  f.partsFor = f.qn; f.partsUnit = f.unit || '';
 }
 function setQty(o, v) { delete o.amt; if (v) { o.qty = v; const n = qtyNum(v); if (n != null) o.qn = n; else delete o.qn; } else { delete o.qty; delete o.qn; } }
 
@@ -2708,7 +2728,8 @@ const ACT = {
   slot: a => { S.slot = a; render(); },
   fPrep: a => { const f = curFood(); if (!f) return; f.prep = f.prep === a ? '' : a; if (DATA.foodLib[f.name] && f.prep) DATA.foodLib[f.name].lastPrep = f.prep; save(); render(); },
   fMethod: a => { const f = curFood(); if (!f) return; if (f.method === a) delete f.method; else f.method = a; save(); render(); },
-  fQty: a => { const f = curFood(); if (!f) return; setQty(f, f.qty === a ? '' : a); save(); render(); },
+  fQty: a => { const f = curFood(); if (!f) return; markPartsBase(f); setQty(f, f.qty === a ? '' : a); save(); render(); },
+  partsFor: a => { const f = curFood(); if (!f) return; if (a === 'all') { delete f.partsFor; delete f.partsUnit; } else { f.partsFor = Number(a); f.partsUnit = f.unit || ''; } rememberMeal(f); save(); render(); },
   fUnit: a => { const f = curFood(); if (!f) return; if (f.unit === a) delete f.unit; else { f.unit = a; if (DATA.foodLib[f.name]) DATA.foodLib[f.name].lastUnit = a; } save(); render(); },
   nutEd: a => { S.nutEd = S.nutEd === a ? null : a; if (S.view === 'settings' || !S.day) S.libOpen = true; render(); },
   dupUse: a => { const f = curFood(); if (!f) return; const old = f.name; renameEntry(f, a); if (!f.prep && lastPrepOf(a)) f.prep = lastPrepOf(a); if (!foodUses(old)) delete DATA.foodLib[old]; invalidate(); save(); render(); },
@@ -2850,7 +2871,7 @@ document.addEventListener('input', e => {
   else if (k === 'foodDraft') S.foodDraft = el.value;
   else if (k === 'foodTime') S.foodTime = el.value;
   else if (k === 'foodQtyX') S.foodQty = el.value.trim();
-  else if (k === 'fQtyX') { const f = curFood(); if (f) { setQty(f, el.value.trim()); save(); } }
+  else if (k === 'fQtyX') { const f = curFood(); if (f) { if (!el._based) { markPartsBase(f); el._based = 1; } setQty(f, el.value.trim()); save(); } }
   else if (k === 'pQtyX') { const f = curFood(); const p = f && f.parts && f.parts[S.partEdit]; if (p) { setQty(p, el.value.trim()); save(); } }
   else if (k === 'partDraft') S.partDraft = el.value;
   else if (k === 'renDraft') S.renDraft = el.value;
