@@ -109,7 +109,7 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
-const APP_VERSION = '21.11ב';
+const APP_VERSION = '21.11ד';
 const AMOUNTS = ['½', '1', '1½', '2', '3'];
 // units: [singular, plural]
 const UNITS = [['יחידה', 'יחידות'], ['גרם', 'גרם'], ['קובייה', 'קוביות'], ['פרוסה', 'פרוסות'], ['כף', 'כפות'], ['כפית', 'כפיות'], ['כוס', 'כוסות'],
@@ -2314,6 +2314,11 @@ const NUT_BASE = {
   'סלט ירקות': [62, 0.9, 4.8, 4.6, 1.3, { 'כף': 18, 'קערה': 250, 'מנה': 150 }],
   'סלט עגבניות שרי': [60, 1.0, 4.2, 4.6, 1.3, { 'כף': 20, 'קערה': 250, 'מנה': 150 }],
   'סלט ביצים': [190, 12, 1.1, 15.5, 0.1, { 'כף': 15, 'מנה': 60 }],
+  // a tofu curry in a coconut sauce someone else cooked (21.11) — estimate: tofu, vegetables, coconut cream in the sauce, a little oil;
+  // ≈ 400 g tofu, 200 g coconut cream, 300 g vegetables, a tablespoon of oil for a 1.1 kg pot. an ordinary spoon of stew with pieces ≈ 20 g
+  'טופו מוקפץ ירוק': [125, 6.5, 4.5, 9.5, 1.5, { 'כף': 20, 'מנה': 250, 'קערה': 300 }],
+  'קארי טופו': [125, 6.5, 4.5, 9.5, 1.5, { 'כף': 20, 'מנה': 250, 'קערה': 300 }],
+  'קארי קוקוס': [125, 6.5, 4.5, 9.5, 1.5, { 'כף': 20, 'מנה': 250, 'קערה': 300 }],
   // baking and pantry (19.11): USDA SR28 unless noted — estimates: סוכר קוקוס, סוכר וניל, שבבי קוקוס, ציר ירקות, אבקת מרק, זעתר, בהרט, ראס אל חנות, סומק. Spice 'מנה' = a pinch, about 1 g
   'אבקת סוכר': [389, 0, 100, 0, 0, { 'כף': 8, 'כפית': 2.5, 'כוס': 120, 'מנה': 8 }],
   'סוכר חום': [380, 0.1, 98, 0, 0, { 'כף': 12, 'כפית': 4, 'כוס': 220, 'מנה': 4 }],
