@@ -109,7 +109,7 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
-const APP_VERSION = '21.11א';
+const APP_VERSION = '21.11ב';
 const AMOUNTS = ['½', '1', '1½', '2', '3'];
 // units: [singular, plural]
 const UNITS = [['יחידה', 'יחידות'], ['גרם', 'גרם'], ['קובייה', 'קוביות'], ['פרוסה', 'פרוסות'], ['כף', 'כפות'], ['כפית', 'כפיות'], ['כוס', 'כוסות'],
@@ -117,7 +117,11 @@ const UNITS = [['יחידה', 'יחידות'], ['גרם', 'גרם'], ['קובי�
 // "5-7", "2", "½", "1½" -> a number (range = middle), for later analysis
 function qtyNum(q) {
   if (q == null || q === '') return null;
-  const one = s => { s = String(s).trim().replace('½', '.5').replace(/^\./, '0.'); const v = parseFloat(s); return isNaN(v) ? null : v; };
+  const one = s => {
+    s = String(s).trim().replace('¼', '.25').replace('¾', '.75').replace('½', '.5').replace(/^\./, '0.');
+    // a fraction: "1/6", and "1:6" the way it's often typed on a phone
+    const fr = s.match(/^(\d+(?:\.\d+)?)\s*[\/:]\s*(\d+(?:\.\d+)?)$/); if (fr) return Number(fr[2]) ? Number(fr[1]) / Number(fr[2]) : null;
+    const v = parseFloat(s); return isNaN(v) ? null : v; };
   const m = String(q).replace(/[–—]/g, '-').split('-').map(one).filter(v => v != null);
   return m.length ? m.reduce((a, b) => a + b, 0) / m.length : null;
 }
@@ -1796,7 +1800,8 @@ function itemNut(f) {
   });
   if (!got) return { v: null, missing };
   // cooking oil, unless oil is already listed as an ingredient
-  const oilG = METHOD_OIL_G[f.method];
+  // a typical pan's oil for a typical plate; with measured ingredients, in proportion to them (a slice of a stew gets a slice of the oil)
+  const oilG = METHOD_OIL_G[f.method] && partsQ.length ? Math.min(METHOD_OIL_G[f.method], W * (PART_OIL_FRAC[f.method] || 0.06)) : METHOD_OIL_G[f.method];
   // (not when the oil was already counted per ingredient)
   if (oilG && !hasListedOil && !parts.some(p => PART_OIL_FRAC[p.method])) {
     const ov = scaleNut(OIL_100, oilG); NUT_KEYS.forEach(([k]) => { v[k] += ov[k]; }); w += ov.kcal; uncSum += ov.kcal * 0.6; W += oilG;
@@ -2994,6 +2999,12 @@ load();
   DATA.settings.merge1711 = true; save();
 })();
 if (fillNutBase()) save();
+// amounts typed as fractions ("1/6", "1:6") were read as 1 before 21.11ב — read them again
+(() => { let ch = false;
+  const fix = o => { if (o && o.qty != null && /[\/:]/.test(String(o.qty))) { const n = qtyNum(o.qty); if (n != null && n !== o.qn) { o.qn = n; ch = true; } } };
+  Object.values(DATA.days).forEach(d => (d.foods || []).forEach(f => { fix(f); (f.parts || []).forEach(fix); }));
+  Object.values(DATA.foodLib).forEach(l => (l.parts || []).forEach(fix));
+  if (ch) { invalidate(); save(); } })();
 // "גרם" chosen without a number (left over from an older version) means no amount
 (function () { let ch = 0; Object.values(DATA.days).forEach(d => (d.foods || []).forEach(f => [f].concat(f.parts || []).forEach(o => { if (o.unit === 'גרם' && o.qty == null && o.qn == null && o.amt == null) { delete o.unit; ch++; } }))); if (ch) save(); })();
 render();
