@@ -109,7 +109,7 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
-const APP_VERSION = '21.11ז';
+const APP_VERSION = '24.11';
 const AMOUNTS = ['½', '1', '1½', '2', '3'];
 // units: [singular, plural]
 const UNITS = [['יחידה', 'יחידות'], ['גרם', 'גרם'], ['קובייה', 'קוביות'], ['פרוסה', 'פרוסות'], ['כף', 'כפות'], ['כפית', 'כפיות'], ['כוס', 'כוסות'],
@@ -864,6 +864,9 @@ function foodEditor(f, i) {
     <div class="lbl">${parts.length ? 'כמה מהמנה כולה?' : 'כמה?'} <span class="muted" style="font-weight:400">(${parts.length ? 'אם שקלת מה שאכלת, הכי מדויק לרשום גרמים · ' : ''}לא חובה)</span></div>${qtyPicker(f.qty != null ? String(f.qty) : (f.amt ? String(f.amt) : ''), f.unit || '', 'fQty', 'fUnit', 'fQtyX')}
     <div class="lbl">מרכיבים <span class="muted" style="font-weight:400">(לא חובה · למנה שמורכבת מכמה דברים)</span></div>
     ${parts.length && f.unit === 'גרם' && f.qty != null ? `<div class="xs muted" style="margin-bottom:6px">רשמת כמה גרם אכלת, אז המרכיבים קובעים רק את ההרכב של המנה, והכמות נלקחת מהמשקל.</div>` : ''}
+    ${parts.length && hasNut(f.name) ? `<div class="small" style="margin-bottom:6px">המרכיבים כאן הם:</div>
+      <div class="wrap" style="margin-bottom:4px">${chip('ממה שהמנה עשויה', !f.partsAdd, 'partsAdd', '0')}${chip('תוספות על המנה', !!f.partsAdd, 'partsAdd', '1')}</div>
+      <div class="xs muted" style="margin-bottom:8px">${f.partsAdd ? 'החישוב: הערכים של המנה עצמה, ועוד התוספות.' : 'למנה יש ערכים משלה. אם המרכיבים הם תוספת עליה (רוטב, פירות), כדאי לבחור "תוספות על המנה".'}</div>` : ''}
     ${parts.some(p => p.qty != null) && f.qn != null && f.unit !== 'גרם' && (f.qn !== 1 || partsBaseOk(f)) ? `<div class="small" style="margin-bottom:6px">כמויות המרכיבים הן בשביל:</div>
       <div class="wrap" style="margin-bottom:4px">${chip(baseText(1, f.unit), partsBaseOk(f) && f.partsFor === 1, 'partsFor', '1')}${partsBaseOk(f) && f.partsFor !== 1 && f.partsFor !== f.qn ? chip(baseText(f.partsFor, f.unit), true, 'partsFor', String(f.partsFor)) : ''}${f.qn !== 1 ? chip('כל מה שרשמתי: ' + baseText(f.qn, f.unit), !partsBaseOk(f) || f.partsFor === f.qn, 'partsFor', 'all') : ''}</div>
       <div class="xs muted" style="margin-bottom:8px">${partsScale(f) !== 1 ? `החישוב מכפיל את המרכיבים פי ${+(partsScale(f)).toFixed(2)}. בפעם הבאה שתבחרי כמות אחרת, הוא יתאים את עצמו.` : 'כשהכמויות הן ליחידה אחת, אפשר אחר כך לשנות את הכמות והמרכיבים יוכפלו לבד.'}</div>` : ''}
@@ -1115,7 +1118,7 @@ const FOOD_HINTS = [
   [/שוקולד|מתוק|סוכר|ממתק|ריבה|דבש|עוגי|עוג/, 'sugar'], [/קפה|אספרסו|לאטה|הפוך|תה (?!צמח)|קולה/, 'caffeine'],
   [/מטוגן|טוגנ|צ׳יפס|שניצל|פלאפל/, 'fried'], [/חומוס|עדש|שעועית|אפונה|טופו|סויה|טמפה|אדממה/, 'legumes'], [/טופו|סויה|טמפה|אדממה|מיסו/, 'soy'],
   [/בצל|שום|כרשה/, 'onion'], [/חריף|צ׳ילי|סחוג|חריסה/, 'spicy'], [/יין|בירה|וודקה|ערק|קוקטייל/, 'alcohol'],
-  [/ביצ|חביתה|שקשוקה/, 'eggs'], [/ירק|סלט|עגבני|מלפפון|ברוקולי|גזר|חציל|קישוא/, 'veg'], [/פרי|פירות|תפוח(?!י? אדמה)|בננה|תות|ענב/, 'fruit']
+  [/ביצ|חביתה|שקשוקה/, 'eggs'], [/ירק|סלט|עגבני|מלפפון|ברוקולי|גזר|חציל|קישוא/, 'veg'], [/(?:^|\s)(?:פרי|פירות)|תפוח(?!י? אדמה)|בננה|תות|ענב/, 'fruit']
 ];
 function guessFoodCats(name) {
   const n = name.trim();
@@ -1739,6 +1742,8 @@ Object.assign(ACT_EXTRA, {
 const NUT_KEYS = [['kcal', 'קלוריות', 'קק״ל'], ['p', 'חלבון', 'ג׳'], ['c', 'פחמימה', 'ג׳'], ['f', 'שומן', 'ג׳'], ['fib', 'סיבים', 'ג׳']];
 // rough fallback only when a food has no grams for that unit (wider uncertainty)
 // a box and a pack are the same thing for a food: "1/6 קופסה טופו" uses the pack weight
+// a whole box or pack: its weight is printed on it, not a guess like a spoon or a handful
+const PACK_UNITS = ['קופסה', 'חפיסה', 'שקית'];
 const UNIT_SAME = { 'קופסה': 'חפיסה', 'חפיסה': 'קופסה' };
 const UNIT_G_FALLBACK = { 'כף': 15, 'כפית': 5, 'כוס': 200, 'חופן': 30, 'קערה': 300, 'מנה': 250, 'פרוסה': 30, 'קובייה': 10 };
 // oil that sticks to one ingredient cooked this way, as a share of its weight (≈15 g on a 250 g pan)
@@ -1756,8 +1761,8 @@ function gramsOf(name, o) {
   const unit = o.unit === 'גרם' && !hasQty ? '' : o.unit;
   let grams = null, unc = 0;
   if (unit === 'גרם') { grams = n; unc = 0.02; } // weighed
-  else if (unit && g[unit]) { grams = n * g[unit]; unc = 0.2; }
-  else if (unit && UNIT_SAME[unit] && g[UNIT_SAME[unit]]) { grams = n * g[UNIT_SAME[unit]]; unc = 0.2; }
+  else if (unit && g[unit]) { grams = n * g[unit]; unc = PACK_UNITS.includes(unit) || (unit === 'יחידה' && (lib.nutSrc === 'label' || lib.gSrc === 'label')) ? 0.03 : 0.2; } // a packaged bar or cup: its weight is on the label
+  else if (unit && UNIT_SAME[unit] && g[UNIT_SAME[unit]]) { grams = n * g[UNIT_SAME[unit]]; unc = 0.03; }
   else if (unit && baseUnitG(name, unit)) { grams = n * baseUnitG(name, unit); unc = 0.25; } // a unit weight added to the table after the food got its values
   else if (!unit && g['מנה']) { grams = n * g['מנה']; unc = 0.35; }
   else if (!unit && g['יחידה']) { grams = n * g['יחידה']; unc = 0.25; }
@@ -1782,6 +1787,16 @@ function itemNut(f) {
   const lib = DATA.foodLib[f.name] || {};
   const parts = f.parts || [];
   const partsQ = parts.filter(p => p.qty != null || p.qn != null);
+  // the dish has its own values and the ingredients are toppings on it (a slice of cake + caramel + blueberries)
+  if (f.partsAdd && hasNut(f.name) && parts.length) {
+    const base = itemNut(Object.assign({}, f, { parts: undefined, partsAdd: undefined }));
+    const top = itemNut({ name: '\u0000', parts, share: f.share });
+    if (!base.v) return base;
+    if (!top.v) return Object.assign({}, base, { partial: true, missing: (base.missing || []).concat(top.missing || []) });
+    const v = {}; NUT_KEYS.forEach(([k]) => { v[k] = base.v[k] + top.v[k]; });
+    const unc = Math.sqrt(Math.pow(base.v.kcal * base.unc, 2) + Math.pow(top.v.kcal * top.unc, 2)) / Math.max(1, v.kcal);
+    return { v, unc, partial: !!top.partial, missing: top.missing || [], noQty: base.noQty, estVals: base.estVals || top.estVals, oilG: (base.oilG || 0) + (top.oilG || 0) };
+  }
   // the dish as a whole: when it has its own values and no measured ingredients (e.g. a bowl eaten out)
   if (hasNut(f.name) && (!parts.length || !partsQ.length || (f.qty != null && !partsQ.length))) {
     const gr = gramsOf(f.name, f); if (!gr) return { v: null, missing: [f.name + ' (אין גרמים ליחידה)'] };
@@ -1789,7 +1804,7 @@ function itemNut(f) {
   }
   if (!parts.length) return { v: null, missing: [f.name] };
   const v = {}; NUT_KEYS.forEach(([k]) => { v[k] = 0; });
-  let w = 0, uncSum = 0, got = 0, noQty = false, estVals = false, W = 0, uncV = 0; const missing = [];
+  let w = 0, uncSum = 0, got = 0, noQty = false, estVals = false, W = 0, uncV = 0, oilA = 0; const missing = [];
   const hasListedOil = parts.some(p => ((DATA.foodLib[p.name] || {}).cats || []).includes('oil') && /שמן|חמאה/.test(p.name));
   parts.forEach(p => {
     if (!hasNut(p.name)) { missing.push(p.name); return; }
@@ -1797,7 +1812,7 @@ function itemNut(f) {
     const pv = scaleNut(DATA.foodLib[p.name].nut, gr.g);
     const u = combUnc(gr.unc, valUnc(p.name)); if (gr.noQty) noQty = true; if (valUnc(p.name) > 0.1 && pv.kcal > 20) estVals = true;
     NUT_KEYS.forEach(([k]) => { v[k] += pv[k]; }); w += pv.kcal; uncSum += pv.kcal * u; uncV += pv.kcal * valUnc(p.name); got++; W += gr.g;
-    if (PART_OIL_FRAC[p.method] && !hasListedOil) { W += gr.g * PART_OIL_FRAC[p.method]; const ov = scaleNut(OIL_100, gr.g * PART_OIL_FRAC[p.method]); NUT_KEYS.forEach(([k]) => { v[k] += ov[k]; }); w += ov.kcal; uncSum += ov.kcal * 0.6; }
+    if (PART_OIL_FRAC[p.method] && !hasListedOil) { W += gr.g * PART_OIL_FRAC[p.method]; oilA += gr.g * PART_OIL_FRAC[p.method]; const ov = scaleNut(OIL_100, gr.g * PART_OIL_FRAC[p.method]); NUT_KEYS.forEach(([k]) => { v[k] += ov[k]; }); w += ov.kcal; uncSum += ov.kcal * 0.6; }
   });
   if (!got) return { v: null, missing };
   // cooking oil, unless oil is already listed as an ingredient
@@ -1805,7 +1820,7 @@ function itemNut(f) {
   const oilG = METHOD_OIL_G[f.method] && partsQ.length ? Math.min(METHOD_OIL_G[f.method], W * (PART_OIL_FRAC[f.method] || 0.06)) : METHOD_OIL_G[f.method];
   // (not when the oil was already counted per ingredient)
   if (oilG && !hasListedOil && !parts.some(p => PART_OIL_FRAC[p.method])) {
-    const ov = scaleNut(OIL_100, oilG); NUT_KEYS.forEach(([k]) => { v[k] += ov[k]; }); w += ov.kcal; uncSum += ov.kcal * 0.6; W += oilG;
+    const ov = scaleNut(OIL_100, oilG); NUT_KEYS.forEach(([k]) => { v[k] += ov[k]; }); w += ov.kcal; uncSum += ov.kcal * 0.6; W += oilG; oilA += oilG;
   }
   // she weighed what she ate ("120 גרם" of the pan), or gave only the dish amount: the ingredients give the mix, her amount gives how much of it
   const dishHasQ = f.qty != null || f.qn != null;
@@ -1813,11 +1828,11 @@ function itemNut(f) {
   if (dg && W > 0) {
     const k = dg.g / W; NUT_KEYS.forEach(([x]) => { v[x] *= k; });
     const ratioEst = partsQ.length < parts.length;
-    return { v, unc: combUnc(combUnc(w ? uncV / w : 0.1, dg.unc), ratioEst ? 0.25 : 0), partial: missing.length > 0, missing, noQty: false, estVals, ratioEst, byDish: true };
+    return { v, unc: combUnc(combUnc(w ? uncV / w : 0.1, dg.unc), ratioEst ? 0.25 : 0), partial: missing.length > 0, missing, noQty: false, estVals, ratioEst, byDish: true, oilG: oilA * k };
   }
   // the ingredients can describe the whole pot; `share` is the part of it she ate
   const sh = (f.share > 0 && f.share < 1 ? f.share : 1) * partsScale(f); if (sh !== 1) NUT_KEYS.forEach(([k]) => { v[k] *= sh; });
-  return { v, unc: w ? uncSum / w : 0.3, partial: missing.length > 0, missing, noQty, estVals };
+  return { v, unc: w ? uncSum / w : 0.3, partial: missing.length > 0, missing, noQty, estVals, oilG: oilA * sh };
 }
 function dayNut(d) {
   const lo = {}, hi = {}, mid = {}, var2 = {}; NUT_KEYS.forEach(([k]) => { lo[k] = hi[k] = mid[k] = var2[k] = 0; });
@@ -1914,7 +1929,7 @@ function itemNutLine(f) {
   const r = itemNut(f);
   const noQty = f.qty == null && f.qn == null && f.amt == null && !f.unit && !(f.parts || []).some(p => p.qty != null || p.qn != null || p.unit);
   const portion = noQty && hasNut(f.name) ? gramsOf(f.name, f) : null;
-  if (r && r.v) return `<div class="xs muted" style="margin-top:4px">כ-${fmtV(r.v.kcal, 'kcal')} קק״ל · חלבון ${fmtV(r.v.p, 'p')} ג׳ · פחמימה ${fmtV(r.v.c, 'c')} ג׳ · שומן ${fmtV(r.v.f, 'f')} ג׳${r.partial ? ' · בלי: ' + esc(r.missing.join(', ')) : ''}${r.unc > 0.12 ? `<br>טווח אפשרי ${fmtRange(r.v.kcal * (1 - r.unc), r.v.kcal * (1 + r.unc), 'kcal')}, כי ${r.noQty ? 'לא נרשמה כמות' : r.ratioEst ? 'לא נרשמו כמויות המרכיבים, אז היחס ביניהם משוער' : r.estVals ? 'חלק מהערכים ל-100 גרם הם הערכה (אוכל ביתי או מבחוץ)' : 'הכמות משוערת (כף, חופן…)'}` : ''}</div>${noQty && !(DATA.foodLib[f.name] || {}).portionInName ? `<div class="xs" style="margin-top:2px;color:#8A6A12">לא נרשמה כמות, אז החישוב לפי מנה רגילה${portion ? ' (' + fmtN(portion.g) + ' ג׳)' : ''}. כדאי לבחור כמות.</div>` : ''}`;
+  if (r && r.v) return `<div class="xs muted" style="margin-top:4px">כ-${fmtV(r.v.kcal, 'kcal')} קק״ל · חלבון ${fmtV(r.v.p, 'p')} ג׳ · פחמימה ${fmtV(r.v.c, 'c')} ג׳ · שומן ${fmtV(r.v.f, 'f')} ג׳${r.partial ? ' · בלי: ' + esc(r.missing.join(', ')) : ''}${r.unc > 0.12 ? `<br>טווח אפשרי ${fmtRange(r.v.kcal * (1 - r.unc), r.v.kcal * (1 + r.unc), 'kcal')}, כי ${r.noQty ? 'לא נרשמה כמות' : r.ratioEst ? 'לא נרשמו כמויות המרכיבים, אז היחס ביניהם משוער' : r.estVals ? 'חלק מהערכים ל-100 גרם הם הערכה (אוכל ביתי או מבחוץ)' : 'הכמות משוערת (כף, חופן…)'}` : ''}${r.oilG >= 2 ? `<br>כולל כ-${fmtN(r.oilG)} ג׳ שמן שהנחתי לפי "${esc(f.method || 'אופן ההכנה')}" (כ-${fmtN(r.oilG * 8.84)} קק״ל). אם היה פחות או יותר, אפשר להוסיף שמן כמרכיב, למשל "שמן זית" או "ספריי שמן", ואז החישוב לפיו.` : ''}</div>${noQty && !(DATA.foodLib[f.name] || {}).portionInName ? `<div class="xs" style="margin-top:2px;color:#8A6A12">לא נרשמה כמות, אז החישוב לפי מנה רגילה${portion ? ' (' + fmtN(portion.g) + ' ג׳)' : ''}. כדאי לבחור כמות.</div>` : ''}`;
   return `<div class="xs muted" style="margin-top:4px">אין עדיין ערכים תזונתיים${r && r.missing.length ? ' ל: ' + esc(r.missing.join(', ')) : ''}</div>`;
 }
 // importing the values file I prepare: {app:'tracker-nutrition', foods:{name:{nut, g}}}
@@ -2326,6 +2341,9 @@ const NUT_BASE = {
   'לביבת תפוחי אדמה': [268, 6.1, 27.8, 14.8, 3.3, { 'יחידה': 40, 'מנה': 120 }],
   'לביבות תפוחי אדמה': [268, 6.1, 27.8, 14.8, 3.3, { 'יחידה': 40, 'מנה': 120 }],
   'לביבה': [268, 6.1, 27.8, 14.8, 3.3, { 'יחידה': 40, 'מנה': 120 }],
+  // oil spray: a short spray (about a second) ≈ 0.5 g of oil
+  'ספריי שמן': [884, 0, 0, 100, 0, { 'יחידה': 0.5, 'מנה': 1 }],
+  'ספריי שמן זית': [884, 0, 0, 100, 0, { 'יחידה': 0.5, 'מנה': 1 }],
   // baking and pantry (19.11): USDA SR28 unless noted — estimates: סוכר קוקוס, סוכר וניל, שבבי קוקוס, ציר ירקות, אבקת מרק, זעתר, בהרט, ראס אל חנות, סומק. Spice 'מנה' = a pinch, about 1 g
   'אבקת סוכר': [389, 0, 100, 0, 0, { 'כף': 8, 'כפית': 2.5, 'כוס': 120, 'מנה': 8 }],
   'סוכר חום': [380, 0.1, 98, 0, 0, { 'כף': 12, 'כפית': 4, 'כוס': 220, 'מנה': 4 }],
@@ -2448,6 +2466,7 @@ const NUT_BASE = {
   'גלידה': [207, 3.5, 24, 11, 0.7, { 'כדור': 60, 'כוס': 130, 'מנה': 100 }],
 };
 // entries taken from USDA SR Legacy (the rest are general estimates)
+const NUT_BASE_LABEL = new Set(["גבינת שמנת 25%", "חטיף חלבון PRO עוגיות", "חטיף חלבון עוגיות", "חטיף חלבון עוגיות קקאו ושוקולד לבן", "חטיף PRO"]);
 const NUT_BASE_USDA = new Set(["לביבת תפוח אדמה", "לביבת תפוחי אדמה", "לביבות תפוחי אדמה", "לביבה", "ממרח חומוס", "חומוס ביתי", "בראוניז", "אבקת סוכר", "סוכר חום", "סוכר דמררה", "קמח מלא", "קמח לבן", "קמח תופח", "קמח לחם", "קמח כוסמין", "קמח כוסמין מלא", "קמח שיפון", "קמח כוסמת", "קמח אורז", "קמח שקדים", "שקדים טחונים", "קמח תירס", "קורנפלור", "עמילן תירס", "סולת", "טפיוקה", "סובין חיטה", "סובין שיבולת שועל", "נבט חיטה", "שמרים יבשים", "שמרים טריים", "אבקת אפייה", "סודה לשתייה", "תמצית וניל", "שוקולד צ׳יפס", "שוקולד לבן", "שוקולד מריר לאפייה", "שוקולד מריר", "שוקולד 100%", "סירופ מייפל", "מייפל", "סירופ אגבה", "סירופ תירס", "מולסה", "ג׳לטין", "אגר אגר", "חלב מרוכז ממותק", "ריבת חלב", "אבקת חלב", "שמנת להקצפה", "שמנת מתוקה 32%", "קצפת", "קרם קוקוס", "חלב קוקוס משומר", "חמאת קקאו", "מרגרינה", "שמן חמניות", "שמן צמחי", "חלבון ביצה", "חלמון", "רסק תפוחים", "מחית תפוחים", "בצק עלים", "בצק פילו", "קורנפלקס", "צימוקים בהירים", "חמוציות", "גרידת לימון", "גרידת תפוז", "פרג", "שומשום מלא", "ציר עוף", "מלח", "קינמון", "כורכום", "פפריקה", "פפריקה מתוקה", "פפריקה חריפה", "פלפל חריף", "פלפל קאיין", "כמון", "פלפל שחור", "אורגנו", "ג׳ינג׳ר טחון", "הל", "אגוז מוסקט", "ציפורן", "קארי", "אבקת שום", "אבקת בצל", "טימין", "רוזמרין", "צ׳ילי גרוס", "אבקת צ׳ילי", "מרווה", "בזיליקום יבש", "פטרוזיליה יבשה", "עלה דפנה", "קימל", "זרעי שומר", "אבקת חרדל", "זעפרן", "פלפל אנגלי", "כוסברה טחונה", "זרעי כוסברה", "שמיר יבש", "אבוקדו", "אבטיח", "אבקת קקאו", "אגוזי ברזיל", "אגוזי לוז", "אגוזי מלך", "אגס", "אדממה", "אוכמניות", "אורז", "אורז בסמטי", "אורז יסמין", "אורז לבן", "אורז מלא", "אטריות אורז", "אטריות ביצים", "אננס", "אספרגוס", "אפונה", "אפרסמון", "אפרסק", "ארטישוק", "אשכולית", "בוטנים", "בורגול", "בזיליקום", "בטטה", "בטטה אפויה", "בייבי תרד", "בייגל", "ביצה", "ביצה קשה", "בירה", "בננה", "בצל", "בצל ירוק", "בצל סגול", "ברוקולי", "גבינה שוויצרית", "גבינת עיזים", "גבינת שמנת", "גזר", "גלידה", "גמבה", "גרגירי חומוס", "גרעיני דלעת", "גרעיני חמנייה", "ג׳ינג׳ר", "דבש", "דובדבנים", "דלעת", "זיתים", "זרעי פשתן", "זרעי צ׳יה", "חומוס", "חומץ", "חומץ בלסמי", "חלב", "חלב 1%", "חלב 3%", "חלב סויה", "חלב קוקוס", "חלב שקדים", "חמאה", "חמאת בוטנים", "חמאת שקדים", "חסה", "חסה רומית", "חציל", "חרדל", "טונה", "טופו", "טורטייה", "טחינה", "טמפה", "טריאקי", "יוגורט", "יוגורט יווני", "יין אדום", "יין לבן", "כוסברה", "כוסמת", "כרוב", "כרוב ניצנים", "כרוב סגול", "כרובית", "כרישה", "לחם", "לחם מלא", "לחם שיפון", "לחמניה", "לימון", "ליצ׳י", "מאפין", "מוצרלה", "מיונז", "מיץ לימון", "מיץ תפוזים", "מלון", "מלפפון", "מלפפון חמוץ", "ממרח שוקולד", "מנגו", "מצה", "מקדמיה", "משמש מיובש", "נבטים", "נוטלה", "נענע", "סוכר", "סלמון", "סלסה", "סלק", "סלרי", "עגבניה", "עגבניות מרוסקות", "עגבניות שרי", "עדשים", "עדשים ירוקות", "עדשים כתומות", "עדשים שחורות", "עלי גפן", "ענבים", "פול", "פולנטה", "פומלה", "פופקורן", "פטה", "פטל", "פטרוזיליה", "פטריות", "פטריות מוקפצות", "פיסטוקים", "פירורי לחם", "פיתה", "פלאפל", "פלפל", "פלפל אדום", "פלפל ירוק", "פלפלים צבעוניים", "פסאטה", "פסטה", "פסטה מלאה", "פסטו", "פפאיה", "פקאן", "פריכיות", "פריכית אורז", "פרמזן", "פשתן", "צימוקים", "צנוברים", "צנונית", "צ׳ילי", "קולה", "קולורבי", "קוסקוס", "קוקוס מגורר", "קטשופ", "קיווי", "קינואה", "קישוא", "קלמנטינה", "קמח", "קמח חומוס", "קפה", "קפיר", "קקאו", "קקאו הולנדי", "קרואסון", "קשיו", "רוטב טריאקי", "רוטב סויה", "רוקט", "ריבה", "רימון", "ריקוטה", "רסק עגבניות", "שום", "שומר", "שומשום", "שוקולד חלב", "שוקולד מריר 70%", "שזיף", "שזיפים מיובשים", "שיבולת שועל", "שמיר", "שמן", "שמן זית", "שמן קוקוס", "שמן קנולה", "שמן שומשום", "שמנת חמוצה", "שמנת מתוקה", "שמפיניון", "שן שום", "שעועית אדומה", "שעועית ירוקה", "שעועית ירוקה מבושלת", "שעועית לבנה", "שעועית שחורה", "שקדים", "תאנה", "תאנים מיובשות", "תותים", "תירס", "תירס משומר", "תמר מג׳הול", "תמרים", "תפוז", "תפוח", "תפוח אדמה", "תפוח אדמה אפוי", "תפוח עץ", "תרד", "תרד מבושל"]);
 const _nutBaseByKey = {};
 function nutBaseFor(name) {
@@ -2460,7 +2479,7 @@ function applyNutBase(name) {
   const lib = DATA.foodLib[name]; if (!lib || hasNut(name)) return false;
   const b = nutBaseFor(name); if (!b) return false;
   lib.nut = { kcal: b[0], p: b[1], c: b[2], f: b[3], fib: b[4] }; lib.nutSrc = 'est';
-  const bn = NUT_BASE[name] ? name : _nutBaseByKey[nameKey(name)]; if (NUT_BASE_USDA.has(bn)) lib.nutNote = 'לפי USDA'; else delete lib.nutNote;
+  const bn = NUT_BASE[name] ? name : _nutBaseByKey[nameKey(name)]; if (NUT_BASE_USDA.has(bn)) lib.nutNote = 'לפי USDA'; else if (NUT_BASE_LABEL.has(bn)) { lib.nutNote = 'לפי התווית ששלחת'; lib.nutSrc = 'label'; } else delete lib.nutNote;
   lib.g = Object.assign({}, b[5], lib.g || {});
   return true;
 }
@@ -2760,6 +2779,7 @@ const ACT = {
   fPrep: a => { const f = curFood(); if (!f) return; f.prep = f.prep === a ? '' : a; if (DATA.foodLib[f.name] && f.prep) DATA.foodLib[f.name].lastPrep = f.prep; save(); render(); },
   fMethod: a => { const f = curFood(); if (!f) return; if (f.method === a) delete f.method; else f.method = a; save(); render(); },
   fQty: a => { const f = curFood(); if (!f) return; markPartsBase(f); setQty(f, f.qty === a ? '' : a); save(); render(); },
+  partsAdd: a => { const f = curFood(); if (!f) return; if (a === '1') f.partsAdd = true; else delete f.partsAdd; save(); render(); },
   partsFor: a => { const f = curFood(); if (!f) return; if (a === 'all') { delete f.partsFor; delete f.partsUnit; } else { f.partsFor = Number(a); f.partsUnit = f.unit || ''; } rememberMeal(f); save(); render(); },
   fUnit: a => { const f = curFood(); if (!f) return; if (f.unit === a) delete f.unit; else { f.unit = a; if (DATA.foodLib[f.name]) DATA.foodLib[f.name].lastUnit = a; } save(); render(); },
   nutEd: a => { S.nutEd = S.nutEd === a ? null : a; if (S.view === 'settings' || !S.day) S.libOpen = true; render(); },
@@ -2857,7 +2877,15 @@ const ACT = {
   dayStart: a => { DATA.settings.dayStart = Number(a); invalidate(); save(); render(); },
   export: () => IMG.all().then(images => {
     let wl = []; try { wl = JSON.parse(localStorage.getItem(WORKOUT_KEY) || '[]'); } catch (e) {}
-    const out = { app: 'tracker', version: 1, exportedAt: new Date().toISOString(), data: DATA, workoutLog: wl, images,
+    // the calculated nutrition too (per day and per item), so the file can be read without redoing the calculation
+    const r1 = x => Math.round(x * 10) / 10, nv = v => Object.fromEntries(NUT_KEYS.map(([k]) => [k, r1(v[k])]));
+    const nutrition = { note: 'calculated estimates: kcal, p = protein g, c = carbs g, f = fat g, fib = fiber g; lo/hi = likely range of the day total; targets from settings', targets: nutTargets(), days: {} };
+    Object.keys(DATA.days).sort().forEach(ds => { try {
+      const d = DATA.days[ds]; if (!(d.foods || []).length) return; const t = dayNut(d);
+      nutrition.days[ds] = { total: nv(t.mid), kcalRange: [Math.round(t.lo.kcal), Math.round(t.hi.kcal)], itemsWithValues: t.n + '/' + t.total, missing: t.missing,
+        items: d.foods.map(f => { const r = itemNut(f); return r && r.v ? Object.assign({ name: f.name }, nv(r.v), { unc: r1(r.unc), oilAssumedG: r.oilG ? r1(r.oilG) : undefined }) : { name: f.name, missing: (r && r.missing) || [f.name] }; }) };
+    } catch (e) {} });
+    const out = { app: 'tracker', version: 1, exportedAt: new Date().toISOString(), data: DATA, nutrition, workoutLog: wl, images,
       legend: { suppTaken: 'supplement value = HH:MM when taken, or true if no time', scales: 'mood score 1-5 (overall mood, optional), energy 1-5 (separate energy entries; older mood entries may also carry energy), pain 0-10, severity קלה<בינונית<חזקה<קשה, bristol 1-7', dayBoundary: 'a day runs until ' + pad(dayStartH()) + ':00 the next morning; entry/supplement/food times earlier than that (00:00-' + pad(dayStartH()) + ':00) happened in the night AFTER that day, not its early morning', foodCats: Object.fromEntries(FOOD_CATS), foodItems: 'a food item may be a meal: share = the fraction of the listed ingredients she ate (e.g. 0.5 = half the pot); parts = its ingredients (each with its own qty/unit and its own groups in foodLib), qty/unit on the item = the whole portion (e.g. 1 bowl); method = how it was cooked (מוקפץ adds oil, מטוגן adds fried+oil), on the dish or on each part; prep = home / bought / eaten out. The groups of an item = foodLib[name].cats + its parts\' cats + method', nutrition: 'foodLib[name].nut = estimated values per 100 g (kcal, p=protein, c=carbs, f=fat, fib=fiber); nutSrc user = typed by her (trust), est = estimate; g = grams per unit (מנה = typical portion). Day totals are estimates with ranges; settings.nutTarget = her daily targets' } };
     download('tracker-' + todayS() + '.json', JSON.stringify(out, null, 1));
     try { localStorage.setItem('tracker.lastBackup', todayS()); } catch (e) {}
