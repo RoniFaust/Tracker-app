@@ -109,7 +109,7 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
-const APP_VERSION = '24.11';
+const APP_VERSION = '25.11';
 const AMOUNTS = ['½', '1', '1½', '2', '3'];
 // units: [singular, plural]
 const UNITS = [['יחידה', 'יחידות'], ['גרם', 'גרם'], ['קובייה', 'קוביות'], ['פרוסה', 'פרוסות'], ['כף', 'כפות'], ['כפית', 'כפיות'], ['כוס', 'כוסות'],
@@ -860,7 +860,7 @@ function foodEditor(f, i) {
     <button class="chip" style="margin-top:6px;min-height:34px;font-size:13px" data-act="nutEd" data-a="${esc(f.name)}">${S.nutEd === f.name ? 'סגירת הערכים' : 'ערכים תזונתיים'}</button>
     ${S.nutEd === f.name ? nutEditorHtml(f.name, [f.unit]) : ''}
     <div class="lbl" style="margin-top:6px">מאיפה?</div><div class="wrap">${PREP.map(x => chip(x, f.prep === x, 'fPrep', x)).join('')}</div>
-    <div class="lbl">איך הוכן? <span class="muted" style="font-weight:400">(לא חובה)</span></div><div class="wrap">${METHODS.map(x => chip(x, f.method === x, 'fMethod', x)).join('')}</div><div class="xs muted" style="margin-top:4px">מוקפץ: מעט שמן במחבת (כפית עד כף) · מטוגן: שכבת שמן או טיגון עמוק</div>
+    <div class="lbl">איך הוכן? <span class="muted" style="font-weight:400">(לא חובה)</span></div><div class="wrap">${METHODS.map(x => chip(x, f.method === x, 'fMethod', x)).join('')}</div><div class="xs muted" style="margin-top:4px">מוקפץ: מעט שמן במחבת (כפית עד כף) · מטוגן: שכבת שמן או טיגון עמוק</div>${(f.parts || []).length && (f.method === 'מוקפץ' || f.method === 'מטוגן' || (f.parts || []).some(p => p.method === 'מוקפץ' || p.method === 'מטוגן')) ? `<div class="wrap" style="margin-top:6px">${chip('בלי שמן', !!f.noOil, 'fNoOil', '1')}</div><div class="xs muted" style="margin-top:2px">${f.noOil ? 'לא נוסף שמן לחישוב.' : 'אם לא היה שמן בכלל (מחבת טפלון, מים), לבחור "בלי שמן". ספריי אפשר להוסיף כמרכיב.'}</div>` : ''}
     <div class="lbl">${parts.length ? 'כמה מהמנה כולה?' : 'כמה?'} <span class="muted" style="font-weight:400">(${parts.length ? 'אם שקלת מה שאכלת, הכי מדויק לרשום גרמים · ' : ''}לא חובה)</span></div>${qtyPicker(f.qty != null ? String(f.qty) : (f.amt ? String(f.amt) : ''), f.unit || '', 'fQty', 'fUnit', 'fQtyX')}
     <div class="lbl">מרכיבים <span class="muted" style="font-weight:400">(לא חובה · למנה שמורכבת מכמה דברים)</span></div>
     ${parts.length && f.unit === 'גרם' && f.qty != null ? `<div class="xs muted" style="margin-bottom:6px">רשמת כמה גרם אכלת, אז המרכיבים קובעים רק את ההרכב של המנה, והכמות נלקחת מהמשקל.</div>` : ''}
@@ -1805,7 +1805,7 @@ function itemNut(f) {
   if (!parts.length) return { v: null, missing: [f.name] };
   const v = {}; NUT_KEYS.forEach(([k]) => { v[k] = 0; });
   let w = 0, uncSum = 0, got = 0, noQty = false, estVals = false, W = 0, uncV = 0, oilA = 0; const missing = [];
-  const hasListedOil = parts.some(p => ((DATA.foodLib[p.name] || {}).cats || []).includes('oil') && /שמן|חמאה/.test(p.name));
+  const hasListedOil = !!f.noOil || parts.some(p => ((DATA.foodLib[p.name] || {}).cats || []).includes('oil') && /שמן|חמאה/.test(p.name));
   parts.forEach(p => {
     if (!hasNut(p.name)) { missing.push(p.name); return; }
     const gr = gramsOf(p.name, p); if (!gr) { missing.push(p.name + (p.unit ? ` (כמה גרם ב${p.unit}?)` : '')); return; }
@@ -2779,6 +2779,7 @@ const ACT = {
   fPrep: a => { const f = curFood(); if (!f) return; f.prep = f.prep === a ? '' : a; if (DATA.foodLib[f.name] && f.prep) DATA.foodLib[f.name].lastPrep = f.prep; save(); render(); },
   fMethod: a => { const f = curFood(); if (!f) return; if (f.method === a) delete f.method; else f.method = a; save(); render(); },
   fQty: a => { const f = curFood(); if (!f) return; markPartsBase(f); setQty(f, f.qty === a ? '' : a); save(); render(); },
+  fNoOil: () => { const f = curFood(); if (!f) return; if (f.noOil) delete f.noOil; else f.noOil = true; save(); render(); },
   partsAdd: a => { const f = curFood(); if (!f) return; if (a === '1') f.partsAdd = true; else delete f.partsAdd; save(); render(); },
   partsFor: a => { const f = curFood(); if (!f) return; if (a === 'all') { delete f.partsFor; delete f.partsUnit; } else { f.partsFor = Number(a); f.partsUnit = f.unit || ''; } rememberMeal(f); save(); render(); },
   fUnit: a => { const f = curFood(); if (!f) return; if (f.unit === a) delete f.unit; else { f.unit = a; if (DATA.foodLib[f.name]) DATA.foodLib[f.name].lastUnit = a; } save(); render(); },
