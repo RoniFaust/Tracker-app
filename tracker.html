@@ -114,7 +114,7 @@ details > summary::-webkit-details-marker { display: none; }
 <div id="sheet" role="dialog" aria-modal="true"><div class="panel" id="sheetPanel"></div></div>
 <script>
 'use strict';
-const APP_VERSION = '26.11ב';
+const APP_VERSION = '27.11א';
 const AMOUNTS = ['½', '1', '1½', '2', '3'];
 // units: [singular, plural]
 const UNITS = [['יחידה', 'יחידות'], ['גרם', 'גרם'], ['קובייה', 'קוביות'], ['פרוסה', 'פרוסות'], ['כף', 'כפות'], ['כפית', 'כפיות'], ['כוס', 'כוסות'],
@@ -194,7 +194,7 @@ const PAIN_WHEN = ['מחזור', 'יציאות', 'הטלת שתן', 'אחרי א
 const PAIN_HELP = ['משכך כאבים', 'חימום', 'מנוחה', 'מתיחות', 'מקלחת חמה', 'שום דבר'];
 const PAIN_IMPACT = ['לא הפריע', 'הפריע קצת', 'נאלצתי לעצור את מה שעשיתי', 'כאב משתק – התקפלות, בכי, צעקות'];
 
-const BELLY_SYMS = ['נפיחות', 'בטן קשה למגע', 'גזים', 'כאב בטן', 'התכווצויות בטן', 'עוויתות', 'דקירות', 'צרבת', 'בחילה', 'תחושת מלאות מהירה'];
+const BELLY_SYMS = ['נפיחות', 'בטן קשה למגע', 'גזים', 'גיהוקים שקטים (אוויר מהפה)', 'כבדות בבטן', 'כאב בטן', 'התכווצויות בטן', 'עוויתות', 'דקירות', 'צרבת', 'בחילה', 'תחושת מלאות מהירה'];
 const STOOL_SYMS = ['דחיפות', 'תחושת ריקון חלקי', 'כאב ביציאה', 'מאמץ / לחץ', 'ריר', 'דם'];
 const TRY_SYMS = ['צורך / דחף', 'מאמץ / לחץ', 'כאב', 'תחושת ריקון חלקי', 'התכווצויות'];
 const URINE_SYMS = ['תכיפות', 'דחיפות', 'כאב / צריבה', 'תחושת ריקון חלקי', 'דם בשתן'];
@@ -374,7 +374,10 @@ function invalidate() { _cycle = null; _workouts = null; _metrics = {}; }
 const isBleed = b => b === 'קל' || b === 'בינוני' || b === 'כבד';
 // a day can have a few kinds of bleeding (spotting at noon, bleeding starting at night); d.bleed stays the heaviest one
 function bleedList(d) { return d.bleeds && d.bleeds.length ? d.bleeds : d.bleed ? [d.bleed] : []; }
-function bleedText(d) { const T = d.bleedT || {}; return bleedList(d).filter(b => b !== 'אין').map(b => b + (isHM(T[b]) ? ' ' + T[b] : '')).join(', '); }
+const BLEED_PARTS = ['בוקר', 'צהריים', 'ערב', 'לילה'];
+// when in the day: a rough part of the day is enough (older entries kept an exact time — shown as its part)
+function bleedPart(v) { if (BLEED_PARTS.includes(v)) return v; if (!isHM(v)) return ''; const h = +v.slice(0, 2); return h < dayStartH() ? 'לילה' : h < 12 ? 'בוקר' : h < 17 ? 'צהריים' : h < 22 ? 'ערב' : 'לילה'; }
+function bleedText(d) { const T = d.bleedT || {}; return bleedList(d).filter(b => b !== 'אין').map(b => b + (bleedPart(T[b]) ? ' ב' + bleedPart(T[b]) : '')).join(', '); }
 function cycleInfo() {
   if (_cycle) return _cycle;
   const bleedDays = Object.keys(DATA.days).filter(s => isBleed(DATA.days[s].bleed)).sort();
@@ -758,10 +761,10 @@ function renderDay() {
     ${suggestCard()}
     ${section('cycle', 'מחזור', '#B85C7E', bleedText(d) ? 'דימום: ' + bleedText(d) + (d.extras.length ? ' · ' + d.extras.join(', ') : '') : d.bleed === 'אין' ? 'אין דימום' : 'לא מולא',
       () => `<div class="lbl">דימום <span class="muted" style="font-weight:400">(אפשר לסמן כמה, למשל הכתמה בצהריים ודימום בלילה)</span></div>
-        <div class="wrap">${BLEED.map(x => { const on = bleedList(d).includes(x), at = (d.bleedT || {})[x]; return `<button type="button" class="chip" aria-pressed="${on}" data-act="bleed" data-a="${esc(x)}">${esc(x)}${on && isHM(at) ? ` <span style="font-weight:600;opacity:.9">${at}</span>` : ''}</button>`; }).join('')}</div>
-        ${S.bleedEdit && bleedList(d).includes(S.bleedEdit) ? `<div class="row" style="flex-wrap:wrap;gap:8px;margin-top:8px"><label class="small muted" for="bleedAt">${esc(S.bleedEdit)}: מתי? (לא חובה)</label>
-          <input id="bleedAt" type="time" class="input" style="width:120px;min-height:40px" value="${isHM((d.bleedT || {})[S.bleedEdit]) ? d.bleedT[S.bleedEdit] : ''}" data-input="bleedAt" data-a="${esc(S.bleedEdit)}">
-          <button class="chip" data-act="bleedDone">סגירה</button><button class="chip" style="color:#A3324A" data-act="bleedOff" data-a="${esc(S.bleedEdit)}">ביטול הסימון</button></div>` : bleedList(d).some(x => x !== 'אין') ? '<div class="xs muted" style="margin-top:4px">לחיצה על סימון פותחת את השעה שלו או את הביטול.</div>' : ''}
+        <div class="wrap">${BLEED.map(x => { const on = bleedList(d).includes(x), at = bleedPart((d.bleedT || {})[x]); return `<button type="button" class="chip" aria-pressed="${on}" data-act="bleed" data-a="${esc(x)}">${esc(x)}${on && at ? ` <span style="font-weight:600;opacity:.9">· ${at}</span>` : ''}</button>`; }).join('')}</div>
+        ${S.bleedEdit && bleedList(d).includes(S.bleedEdit) ? `<div style="margin-top:8px;padding:10px;border-radius:10px;background:var(--bg)"><div class="small" style="font-weight:700">${esc(S.bleedEdit)}: מתי? <span class="muted" style="font-weight:400">(לא חובה)</span></div>
+          <div class="wrap">${BLEED_PARTS.map(p => chip(p, bleedPart((d.bleedT || {})[S.bleedEdit]) === p, 'bleedPart', p)).join('')}</div>
+          <div class="wrap" style="margin-top:4px"><button class="chip" data-act="bleedDone">סגירה</button><button class="chip" style="color:#A3324A" data-act="bleedOff" data-a="${esc(S.bleedEdit)}">ביטול הסימון</button></div></div>` : bleedList(d).some(x => x !== 'אין') ? '<div class="xs muted" style="margin-top:4px">לחיצה על סימון פותחת את החלק ביום שלו או את הביטול.</div>' : ''}
         <div class="lbl">נוסף (לא חובה)</div>${chips(CYCLE_EXTRAS, x => d.extras.includes(x), 'extra')}`)}
     ${section('sleep', 'שינה', '#3F6FA8', [d.sleepH ? d.sleepH + ' שעות' : '', d.bedT && d.wakeT ? d.bedT + '–' + d.wakeT : '', d.sleepQ, d.wakes && d.wakes !== 'לא התעוררתי' ? 'התעוררתי ' + d.wakes : '', d.morning && d.morning !== 'קמתי כרגיל' ? (d.morning.includes('ונרדמתי') ? 'קימה מוקדמת + שינה שנייה' : 'קימה מוקדמת') : '', d.dream && d.dream !== 'לא זוכרת' ? d.dream : '', d.sleepNote ? '✎' : ''].filter(Boolean).join(' · ') || 'לא מולא',
       () => `<div class="lbl">כמה שעות? (הלילה שעבר)</div>${chips(SLEEP_H, x => d.sleepH === x, 'sleepH')}<div class="lbl">איכות</div>${chips(SLEEP_Q, x => d.sleepQ === x, 'sleepQ')}<div class="lbl">חלומות</div>${chips(DREAMS, x => d.dream === x, 'dream')}
@@ -2773,7 +2776,7 @@ function hideSug() { document.querySelectorAll('.sugbox').forEach(b => { b.hidde
 // the list is kept in the order it happened, and d.bleed is the heaviest (that is what the cycle count reads)
 function setBleeds(d, L) {
   const T = d.bleedT || {};
-  L.sort((x, y) => (isHM(T[x]) ? tKey(T[x]) : '3') .localeCompare(isHM(T[y]) ? tKey(T[y]) : '3'));
+  const ord = x => { const p = bleedPart(T[x]); return p ? BLEED_PARTS.indexOf(p) : 9; }; L.sort((x, y) => ord(x) - ord(y));
   if (!L.length) { delete d.bleeds; delete d.bleed; return; }
   d.bleeds = L; d.bleed = L.reduce((m, x) => BLEED.indexOf(x) > BLEED.indexOf(m) ? x : m, L[0]);
 }
@@ -2826,10 +2829,11 @@ const ACT = {
     const d = editDay(S.day); let L = bleedList(d).slice(); d.bleedT = d.bleedT || {};
     if (L.includes(a) && a !== 'אין') { S.bleedEdit = S.bleedEdit === a ? null : a; render(); return; }
     if (a === 'אין') { L = L.includes('אין') ? [] : ['אין']; d.bleedT = {}; S.bleedEdit = null; }
-    else { L = L.filter(x => x !== 'אין').concat([a]); if (S.day === todayS()) d.bleedT[a] = nowHM(); S.bleedEdit = S.day === todayS() ? null : a; }
+    else { L = L.filter(x => x !== 'אין').concat([a]); if (S.day === todayS()) d.bleedT[a] = bleedPart(nowHM()); S.bleedEdit = S.day === todayS() ? null : a; }
     setBleeds(d, L); save(); render(); },
   bleedOff: a => { const d = editDay(S.day); setBleeds(d, bleedList(d).filter(x => x !== a)); if (d.bleedT) delete d.bleedT[a]; S.bleedEdit = null; save(); render(); },
   bleedDone: () => { S.bleedEdit = null; render(); },
+  bleedPart: a => { const d = editDay(S.day); d.bleedT = d.bleedT || {}; const x = S.bleedEdit; if (!x) return; if (bleedPart(d.bleedT[x]) === a) delete d.bleedT[x]; else d.bleedT[x] = a; setBleeds(d, bleedList(d).slice()); save(); render(); },
   extra: a => { toggleIn(editDay(S.day).extras, a); save(); render(); },
   sleepH: a => { const d = editDay(S.day); d.sleepH = d.sleepH === a ? '' : a; save(); render(); },
   sleepQ: a => { const d = editDay(S.day); d.sleepQ = d.sleepQ === a ? '' : a; save(); render(); },
@@ -2970,7 +2974,7 @@ const ACT = {
         items: d.foods.map(f => { const r = itemNut(f); return r && r.v ? Object.assign({ name: f.name }, nv(r.v), { unc: r1(r.unc), oilAssumedG: r.oilG ? r1(r.oilG) : undefined }) : { name: f.name, missing: (r && r.missing) || [f.name] }; }) };
     } catch (e) {} });
     const out = { app: 'tracker', version: 1, exportedAt: new Date().toISOString(), data: DATA, nutrition, workoutLog: wl, images,
-      legend: { bleed: 'bleed = the heaviest bleeding of the day (used for cycle counting); bleeds = all kinds marked that day in time order; bleedT = HH:MM for each kind', suppTaken: 'supplement value = HH:MM when taken, or true if no time', scales: 'mood score 1-5 (overall mood, optional), energy 1-5 (separate energy entries; older mood entries may also carry energy), pain 0-10, severity קלה<בינונית<חזקה<קשה, bristol 1-7', dayBoundary: 'a day runs until ' + pad(dayStartH()) + ':00 the next morning; entry/supplement/food times earlier than that (00:00-' + pad(dayStartH()) + ':00) happened in the night AFTER that day, not its early morning', foodCats: Object.fromEntries(FOOD_CATS), foodItems: 'a food item may be a meal: share = the fraction of the listed ingredients she ate (e.g. 0.5 = half the pot); parts = its ingredients (each with its own qty/unit and its own groups in foodLib), qty/unit on the item = the whole portion (e.g. 1 bowl); method = how it was cooked (מוקפץ adds oil, מטוגן adds fried+oil), on the dish or on each part; prep = home / bought / eaten out. The groups of an item = foodLib[name].cats + its parts\' cats + method', nutrition: 'foodLib[name].nut = estimated values per 100 g (kcal, p=protein, c=carbs, f=fat, fib=fiber); nutSrc user = typed by her (trust), est = estimate; g = grams per unit (מנה = typical portion). Day totals are estimates with ranges; settings.nutTarget = her daily targets' } };
+      legend: { bleed: 'bleed = the heaviest bleeding of the day (used for cycle counting); bleeds = all kinds marked that day in time order; bleedT = part of the day for each kind (בוקר/צהריים/ערב/לילה; older entries may hold HH:MM)', suppTaken: 'supplement value = HH:MM when taken, or true if no time', scales: 'mood score 1-5 (overall mood, optional), energy 1-5 (separate energy entries; older mood entries may also carry energy), pain 0-10, severity קלה<בינונית<חזקה<קשה, bristol 1-7', dayBoundary: 'a day runs until ' + pad(dayStartH()) + ':00 the next morning; entry/supplement/food times earlier than that (00:00-' + pad(dayStartH()) + ':00) happened in the night AFTER that day, not its early morning', foodCats: Object.fromEntries(FOOD_CATS), foodItems: 'a food item may be a meal: share = the fraction of the listed ingredients she ate (e.g. 0.5 = half the pot); parts = its ingredients (each with its own qty/unit and its own groups in foodLib), qty/unit on the item = the whole portion (e.g. 1 bowl); method = how it was cooked (מוקפץ adds oil, מטוגן adds fried+oil), on the dish or on each part; prep = home / bought / eaten out. The groups of an item = foodLib[name].cats + its parts\' cats + method', nutrition: 'foodLib[name].nut = estimated values per 100 g (kcal, p=protein, c=carbs, f=fat, fib=fiber); nutSrc user = typed by her (trust), est = estimate; g = grams per unit (מנה = typical portion). Day totals are estimates with ranges; settings.nutTarget = her daily targets' } };
     download('tracker-' + todayS() + '.json', JSON.stringify(out, null, 1));
     try { localStorage.setItem('tracker.lastBackup', todayS()); } catch (e) {}
     if (S.tab === 'settings' && !S.day) setTimeout(render, 300);
